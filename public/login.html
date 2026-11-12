@@ -19,17 +19,24 @@
   button { font: inherit; font-weight: 700; font-size: 15px; background: var(--preto); color: #fff; border: 0; border-radius: 8px; padding: 11px; cursor: pointer; }
   button:hover { background: var(--laranja); }
   .erro { color: #b91c1c; font-size: 13px; }
+  .ajuda { font-size: 12.5px; color: var(--texto-2); text-align: center; margin-top: 2px; }
 </style>
 </head>
 <body>
   <form method="post" action="/api/login">
     <img src="/logo.png" alt="NAK">
     <h1>Painel Comercial</h1>
-    <p>Digite a senha da equipe para ver o painel.</p>
-    <div style="display:grid;gap:6px"><label for="senha">Senha</label><input id="senha" name="senha" type="password" autocomplete="current-password" required autofocus></div>
-    <p class="erro" id="erro" hidden>Senha incorreta. Tente de novo.</p>
+    <p>Entre com o seu e-mail e a sua senha de acesso.</p>
+    <div style="display:grid;gap:6px"><label for="email">E-mail</label><input id="email" name="email" type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></div>
+    <div style="display:grid;gap:6px"><label for="senha">Senha</label><input id="senha" name="senha" type="password" autocomplete="current-password" required></div>
+    <p class="erro" id="erro" hidden>E-mail ou senha incorretos. Tente de novo.</p>
+    <p class="erro" id="erro-servidor" hidden>Não foi possível entrar agora. Tente de novo em instantes.</p>
     <button type="submit">Entrar</button>
+    <p class="ajuda">Esqueceu a senha? Peça ao administrador do painel para criar uma nova.</p>
   </form>
-  <script>if (new URLSearchParams(location.search).has('erro')) document.getElementById('erro').hidden = false;</script>
+  <script>
+    const e = new URLSearchParams(location.search).get('erro');
+    if (e) document.getElementById(e === 'servidor' ? 'erro-servidor' : 'erro').hidden = false;
+  </script>
 </body>
 </html>

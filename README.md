@@ -1,6 +1,6 @@
 # Painel Comercial NAK
 
-Dashboard de vendas da NAK ligado à API do CRM DataCrazy, com login por senha.
+Dashboard de vendas da NAK ligado à API do CRM DataCrazy, com login por usuário e perfis de acesso.
 
 ## Como funciona
 
@@ -32,7 +32,21 @@ public/index.html  abas Visão geral, Vendedores, Curva ABC, Produtos, Carteira 
    ```
 6. **GitHub → Settings → Secrets and variables → Actions**: crie `PAINEL_URL` (endereço do painel) e `CRON_SECRET` (o mesmo da Vercel) para ligar a sincronização de hora em hora.
 
-Abra o endereço do painel, digite a senha e pronto.
+Abra o endereço do painel e entre com o e-mail `admin` e a senha `PAINEL_SENHA`. Em **Acessos**, crie o seu acesso de administrador e os dos supervisores e vendedores.
+
+## Acessos
+
+| Perfil | Vê | Pode |
+|---|---|---|
+| Administrador | o painel inteiro | criar, alterar e desativar qualquer acesso |
+| Supervisor | o painel inteiro | criar, alterar e desativar acessos de vendedores |
+| Vendedor | só os negócios em que é o responsável no CRM (e os clientes e produtos deles) | trocar a própria senha |
+
+- O filtro do vendedor é aplicado no servidor (`lib/dados.js`), então ele não consegue ver dados de outros nem mexendo na página.
+- O vendedor é ligado ao atendente do DataCrazy pelo id (campo "Vendedor no CRM").
+- Senhas guardadas com PBKDF2-SHA256. Trocar a senha, desativar ou mudar o perfil encerra as sessões abertas daquela pessoa.
+- `admin` + `PAINEL_SENHA` é o acesso de emergência: sempre funciona enquanto a variável existir. Use uma senha forte.
+- A tabela `usuarios` é criada sozinha no primeiro login depois da atualização.
 
 ## Desenvolvimento
 

@@ -78,7 +78,8 @@ html, body { margin: 0; background: #f4f4f5; }
       const j = await r.json();
       if (!r.ok) throw new Error(j.erro || r.status);
       for (const k of Object.keys(DS)) DS[k] = { status: 'ok', data: j[k] || [] };
-      meta = { atualizado_em: j.atualizado_em };
+      meta = { atualizado_em: j.atualizado_em, usuario: j.usuario || null };
+      dispatchEvent(new CustomEvent('nk:usuario', { detail: meta.usuario }));
     } catch (e) {
       console.error('[painel] falha ao carregar', e);
       for (const k of Object.keys(DS)) DS[k] = { status: 'error', data: [], message: String(e) };
@@ -311,6 +312,48 @@ html, body { margin: 0; background: #f4f4f5; }
 }
 @media (prefers-reduced-motion: reduce) { .nk, .nk-lat { transition: none; } }
 @media (max-width: 600px) { .nk .esconde-estreito { display: none; } .nk select.dash-select { min-width: 0; width: 100%; } .nk-filtro { flex: 1 1 100%; } .nk-intervalo { margin-left: 0; } .nk-logo { height: 36px; } }
+/* ===== Acessos e minha conta ===== */
+.nk-lat-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-width: 0; }
+.nk-lat-user .ini { width: 30px; height: 30px; border-radius: 50%; background: var(--nk-preto); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: 0 0 auto; }
+.nk-lat-user span { display: grid; min-width: 0; line-height: 1.25; }
+.nk-lat-user b { font-size: 13px; color: var(--nk-texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nk-lat-user small { font-size: 11.5px; color: var(--nk-texto-3); }
+.nk.recolhido .nk-lat-user span { display: none; }
+.nk.recolhido .nk-lat-user { justify-content: center; padding: 8px 0; }
+@media (max-width: 900px) { .nk.recolhido .nk-lat-user span { display: grid; } .nk.recolhido .nk-lat-user { justify-content: flex-start; padding: 8px 10px; } }
+.nk-pill.p-admin { background: var(--nk-preto); color: #fff; }
+.nk-pill.p-supervisor { background: var(--nk-laranja); color: #fff; }
+.nk-pill.p-vendedor { background: #ececef; color: var(--nk-texto-2); }
+.nk-pill.p-off { background: #fff; color: var(--nk-texto-3); border: 1px dashed var(--nk-c); }
+.nk tr.desativado td { color: var(--nk-texto-3); }
+#t-acessos td.txt { min-width: 0; }
+#t-acessos tbody tr[data-id] { cursor: pointer; }
+.nk-form { display: grid; gap: 14px 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); align-items: start; }
+.nk-campo { display: grid; gap: 5px; min-width: 0; }
+.nk-campo label { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--nk-texto-3); font-weight: 700; }
+.nk-campo input, .nk-campo select { font: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--nk-linha); border-radius: 8px; background: #fff; color: var(--nk-texto); width: 100%; min-width: 0; }
+.nk-campo small { font-size: 11.5px; color: var(--nk-texto-3); }
+.nk-campo.check { align-self: end; }
+.nk-campo.check label { display: flex; gap: 8px; align-items: center; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--nk-texto); padding: 9px 0; cursor: pointer; }
+.nk-campo.check input { width: 17px; height: 17px; accent-color: var(--nk-laranja); }
+.nk-acoes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; grid-column: 1 / -1; }
+.nk-bt { font: inherit; font-size: 13.5px; font-weight: 700; background: var(--nk-preto); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer; }
+.nk-bt:hover { background: var(--nk-laranja); }
+.nk-bt:disabled { opacity: .55; cursor: default; }
+.nk-bt-sec { font: inherit; font-size: 13px; border: 1px solid var(--nk-linha); background: #fff; color: var(--nk-texto); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.nk-bt-sec:hover { border-color: var(--nk-laranja); color: var(--nk-laranja-esc); }
+.nk-bt-link { font: inherit; font-size: 12.5px; font-weight: 600; background: none; border: 0; color: var(--nk-laranja-esc); cursor: pointer; padding: 2px 4px; }
+.nk-bt-link:hover { text-decoration: underline; }
+.nk-msg { font-size: 13px; margin: 0; }
+.nk-msg.ok { color: var(--nk-ok); }
+.nk-msg.erro { color: #b91c1c; }
+.nk-perfis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin: 0; padding: 0; list-style: none; }
+.nk-perfis li { border: 1px solid var(--nk-linha); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--nk-texto-2); display: grid; gap: 6px; align-content: start; }
+.nk-perfis li .nk-pill { justify-self: start; }
+.nk-aviso { background: var(--nk-laranja-claro); border: 1px solid #ffd9bf; color: var(--nk-texto); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin: 0; }
+.nk-conta dl { margin: 0 0 4px; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 13.5px; }
+.nk-conta dt { color: var(--nk-texto-3); }
+.nk-conta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -329,7 +372,13 @@ html, body { margin: 0; background: #f4f4f5; }
       <button type="button" role="tab" id="aba-carteira" data-pag="carteira" aria-selected="false" title="Carteira de clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18"/></svg><span>Carteira de clientes</span></button>
       <button type="button" role="tab" id="aba-funil" data-pag="funil" aria-selected="false" title="Funil e orçamentos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg><span>Funil e orçamentos</span></button>
     </nav>
+    <div class="nk-lat-secao">Conta</div>
+    <nav class="nk-abas" role="tablist" aria-label="Conta e acessos">
+      <button type="button" role="tab" id="aba-acessos" data-pag="acessos" aria-selected="false" title="Acessos" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .5 4.1 1.4"/><path d="M19 13v8M15 17h8"/></svg><span>Acessos</span></button>
+      <button type="button" role="tab" id="aba-conta" data-pag="conta" aria-selected="false" title="Minha conta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 018 0v3.5"/><circle cx="12" cy="15.5" r="1.3"/></svg><span>Minha conta</span></button>
+    </nav>
     <div class="nk-lat-pe">
+      <div class="nk-lat-user" id="lat-usuario" hidden><i class="ini" aria-hidden="true">·</i><span><b data-u="nome">—</b><small data-u="perfil">—</small></span></div>
       <div class="nk-lat-atual"><i></i><span>Dados até <b data-draw="ref" data-source="c_periodos" data-field="fim" data-where="id=tudo">—</b></span></div>
       <a class="nk-lat-sair" href="/api/login" title="Sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>Sair</span></a>
     </div>
@@ -348,7 +397,7 @@ html, body { margin: 0; background: #f4f4f5; }
 
   <div class="nk-filtros" id="filtros">
     <div class="nk-filtro"><label for="f-periodo">Período</label><select class="dash-select" id="f-periodo" data-draw="f-periodo" data-source="c_periodos"></select></div>
-    <div class="nk-filtro"><label for="f-vendedor">Vendedor</label><select class="dash-select" id="f-vendedor" data-draw="f-vendedor" data-source="c_vend"></select></div>
+    <div class="nk-filtro" id="filtro-vendedor"><label for="f-vendedor">Vendedor</label><select class="dash-select" id="f-vendedor" data-draw="f-vendedor" data-source="c_vend"></select></div>
     <button type="button" class="nk-limpar" id="f-limpar">Limpar filtros</button>
     <div class="nk-intervalo" id="f-intervalo">De <b data-draw="intervalo-ini">—</b> a <b data-draw="intervalo-fim">—</b></div>
   </div>
@@ -600,6 +649,63 @@ html, body { margin: 0; background: #f4f4f5; }
         <div class="nk-graf" data-draw="g-mensal" data-source="c_mensal" style="min-height:280px"></div>
         <div class="nk-leg"><span><i style="background:var(--nk-laranja)"></i>Faturado</span><span><i style="background:var(--nk-grafite)"></i>Em aberto (orçamento, separação, aguardando)</span></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ===================== ACESSOS (administrador e supervisor) ===================== -->
+  <section class="nk-pagina" id="acessos" role="tabpanel" aria-labelledby="aba-acessos" hidden>
+    <div class="nk-card" id="card-acessos">
+      <div class="nk-card-cab">
+        <div><h3>Acessos ao painel</h3><p class="nk-card-sub" id="acessos-sub">Quem entra no painel e o que cada um vê</p></div>
+        <button type="button" class="nk-bt" id="acesso-novo">+ Novo acesso</button>
+      </div>
+      <form class="nk-card nk-form" id="acesso-form" hidden novalidate style="margin-bottom:14px;background:#fafafa">
+        <h3 style="grid-column:1/-1;margin:0" id="acesso-form-tit">Novo acesso</h3>
+        <div class="nk-campo"><label for="ac-nome">Nome</label><input id="ac-nome" name="nome" autocomplete="off" required></div>
+        <div class="nk-campo"><label for="ac-email">E-mail (usado para entrar)</label><input id="ac-email" name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" required></div>
+        <div class="nk-campo"><label for="ac-perfil">Perfil</label><select id="ac-perfil" name="perfil"></select></div>
+        <div class="nk-campo" id="ac-vend-campo"><label for="ac-vendedor">Vendedor no CRM</label><select id="ac-vendedor" name="vendedor_id"></select><small>Ele verá só os negócios desse vendedor.</small></div>
+        <div class="nk-campo"><label for="ac-senha" id="ac-senha-rot">Senha inicial</label><input id="ac-senha" name="senha" type="text" autocomplete="new-password" spellcheck="false" minlength="8"><small id="ac-senha-dica">Mínimo de 8 caracteres. Passe para a pessoa, que pode trocar em Minha conta.</small></div>
+        <div class="nk-campo check" id="ac-ativo-campo" hidden><label><input type="checkbox" id="ac-ativo" name="ativo"> Acesso ativo</label></div>
+        <div class="nk-acoes">
+          <button type="submit" class="nk-bt" id="ac-salvar">Salvar</button>
+          <button type="button" class="nk-bt-sec" id="ac-cancelar">Cancelar</button>
+          <button type="button" class="nk-bt-sec" id="ac-gerar">Gerar senha</button>
+          <p class="nk-msg" id="ac-msg" role="status"></p>
+        </div>
+      </form>
+      <div class="nk-tab-wrap">
+        <table id="t-acessos">
+          <thead><tr><th class="txt">Nome</th><th class="txt">E-mail</th><th class="txt">Perfil</th><th class="txt">Vendedor no CRM</th><th class="txt">Situação</th><th>Último acesso</th><th></th></tr></thead>
+          <tbody><tr><td colspan="7" class="txt">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="nk-card">
+      <div class="nk-card-cab"><div><h3>O que cada perfil vê</h3></div></div>
+      <ul class="nk-perfis">
+        <li><span class="nk-pill p-admin">Administrador</span>Vê o painel inteiro e cria, altera e desativa qualquer acesso.</li>
+        <li><span class="nk-pill p-supervisor">Supervisor</span>Vê o painel inteiro, de todos os vendedores, e cuida dos acessos dos vendedores.</li>
+        <li><span class="nk-pill p-vendedor">Vendedor</span>Vê só os próprios negócios, clientes e produtos, em todas as telas. A regra vale no servidor, não só na tela.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== MINHA CONTA ===================== -->
+  <section class="nk-pagina" id="conta" role="tabpanel" aria-labelledby="aba-conta" hidden>
+    <div class="nk-card nk-conta">
+      <div class="nk-card-cab"><div><h3>Minha conta</h3></div></div>
+      <dl><dt>Nome</dt><dd data-u="nome">—</dd><dt>E-mail</dt><dd data-u="email">—</dd><dt>Perfil</dt><dd data-u="perfil">—</dd><dt id="conta-vend-rot" hidden>Vendedor no CRM</dt><dd data-u="vendedor" id="conta-vend" hidden>—</dd></dl>
+    </div>
+    <div class="nk-card">
+      <div class="nk-card-cab"><div><h3>Trocar senha</h3><p class="nk-card-sub">Ao trocar, as outras sessões abertas com esta conta são encerradas.</p></div></div>
+      <p class="nk-aviso" id="conta-emergencia" hidden>Você entrou com o acesso de emergência (e-mail "admin"). A senha dele é a PAINEL_SENHA, que só muda nas variáveis da Vercel. Para o dia a dia, crie um acesso de administrador com o seu e-mail em Acessos.</p>
+      <form class="nk-form" id="conta-form" novalidate>
+        <div class="nk-campo"><label for="ct-atual">Senha atual</label><input id="ct-atual" type="password" autocomplete="current-password" required></div>
+        <div class="nk-campo"><label for="ct-nova">Nova senha</label><input id="ct-nova" type="password" autocomplete="new-password" minlength="8" required><small>Mínimo de 8 caracteres.</small></div>
+        <div class="nk-campo"><label for="ct-conf">Repita a nova senha</label><input id="ct-conf" type="password" autocomplete="new-password" minlength="8" required></div>
+        <div class="nk-acoes"><button type="submit" class="nk-bt">Trocar senha</button><p class="nk-msg" id="ct-msg" role="status"></p></div>
+      </form>
     </div>
   </section>
 
@@ -1034,7 +1140,9 @@ window.NK = (function () {
   const mostra = (pag) => {
     abas.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pag === pag)));
     document.querySelectorAll('.nk-pagina').forEach((s) => { s.hidden = s.id !== pag; });
+    document.getElementById('filtros').hidden = pag === 'acessos' || pag === 'conta';
     dash.setLink(pag);
+    dispatchEvent(new CustomEvent('nk:pagina', { detail: pag }));
   };
   abas.forEach((b) => b.addEventListener('click', () => mostra(b.dataset.pag)));
   // menu lateral: recolhe no computador, abre como gaveta no celular
@@ -1871,6 +1979,155 @@ window.NK = (function () {
       { fn: (r) => F.int(r.qtd) }, { cls: 'forte', fn: (r) => F.brl(r.total) }], '420px', 'det-prod-vendas'));
     box.append(cv);
   }
+})();
+</script>
+<script>
+// ===================== ACESSOS E MINHA CONTA =====================
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const NOMES = { admin: 'Administrador', supervisor: 'Supervisor', vendedor: 'Vendedor' };
+  const el = (tag, props = {}, ...filhos) => { const e = Object.assign(document.createElement(tag), props); e.append(...filhos); return e; };
+  const quando = (s) => { if (!s) return 'Nunca'; const d = new Date(s); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  let eu = null, lista = null, editando = null;
+
+  async function api(url, metodo = 'GET', corpo) {
+    const r = await fetch(url, { method: metodo, credentials: 'same-origin', headers: corpo ? { 'Content-Type': 'application/json' } : {}, body: corpo ? JSON.stringify(corpo) : undefined });
+    if (r.status === 401) { location.href = '/login.html'; throw new Error('Sessão encerrada.'); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erro || 'Erro ' + r.status);
+    return j;
+  }
+  const msg = (id, texto, tipo) => { const m = $(id); m.textContent = texto || ''; m.className = 'nk-msg' + (tipo ? ' ' + tipo : ''); };
+
+  // ---- quem está logado: ajusta menu, filtro de vendedor e Minha conta
+  addEventListener('nk:usuario', (ev) => {
+    eu = ev.detail;
+    if (!eu) return;
+    const gestor = eu.perfil === 'admin' || eu.perfil === 'supervisor';
+    $('aba-acessos').hidden = !gestor;
+    $('lat-usuario').hidden = false;
+    $('lat-usuario').querySelector('.ini').textContent = (eu.nome || '?').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+    document.querySelectorAll('[data-u]').forEach((n) => {
+      const k = n.dataset.u;
+      n.textContent = k === 'perfil' ? NOMES[eu.perfil] || eu.perfil : (eu[k] || '—');
+    });
+    $('conta-vend-rot').hidden = $('conta-vend').hidden = eu.perfil !== 'vendedor';
+    $('conta-emergencia').hidden = !eu.emergencia;
+    $('conta-form').hidden = !!eu.emergencia;
+    if (eu.perfil === 'vendedor') {
+      // O servidor já manda só os dados dele; o filtro de vendedor não faz sentido.
+      $('filtro-vendedor').hidden = true;
+      if (dash.params().vendedor !== 'Todos') dash.setParams({ vendedor: 'Todos' });
+      document.querySelector('.nk-sub').textContent = 'Seus negócios, clientes e produtos no CRM DataCrazy';
+    }
+    if (!gestor && !$('acessos').hidden) $('aba-geral').click();
+    if (gestor && !$('acessos').hidden) carregar();
+  });
+  addEventListener('nk:pagina', (ev) => { if (ev.detail === 'acessos' && eu) carregar(); });
+
+  // ---- lista de acessos
+  async function carregar() {
+    try { lista = await api('/api/usuarios'); desenha(); }
+    catch (e) { $('t-acessos').tBodies[0].replaceChildren(el('tr', {}, el('td', { className: 'txt', colSpan: 7, textContent: 'Não foi possível carregar: ' + e.message }))); }
+  }
+  function desenha() {
+    const { usuarios } = lista;
+    const ativos = usuarios.filter((u) => u.ativo).length;
+    $('acessos-sub').textContent = `${ativos} ${ativos === 1 ? 'acesso ativo' : 'acessos ativos'}` + (usuarios.length > ativos ? ` · ${usuarios.length - ativos} desativado(s)` : '')
+      + (eu.perfil === 'supervisor' ? ' · como supervisor, você cuida dos acessos de vendedores' : '');
+    const corpo = $('t-acessos').tBodies[0];
+    if (!usuarios.length) {
+      corpo.replaceChildren(el('tr', {}, el('td', { className: 'txt', colSpan: 7, textContent: 'Nenhum acesso criado ainda. Clique em "Novo acesso".' })));
+      return;
+    }
+    corpo.replaceChildren(...usuarios.map((u) => {
+      const tr = el('tr', { className: u.ativo ? '' : 'desativado', title: 'Clique para editar' },
+        el('td', { className: 'txt' }, el('b', { textContent: u.nome })),
+        el('td', { className: 'txt', textContent: u.email }),
+        el('td', { className: 'txt' }, el('span', { className: 'nk-pill p-' + u.perfil, textContent: NOMES[u.perfil] })),
+        el('td', { className: 'txt', textContent: u.perfil === 'vendedor' ? (u.vendedor || 'Vendedor não encontrado') : 'Todos' }),
+        el('td', { className: 'txt' }, el('span', { className: 'nk-pill ' + (u.ativo ? 'p-vendedor' : 'p-off'), textContent: u.ativo ? 'Ativo' : 'Desativado' })),
+        el('td', { textContent: quando(u.ultimo_acesso) }),
+        el('td', {}, el('button', { type: 'button', className: 'nk-bt-link', textContent: 'Editar' })));
+      tr.dataset.id = u.id;
+      tr.addEventListener('click', () => abre(u));
+      return tr;
+    }));
+  }
+
+  // ---- formulário de criar e editar
+  function opcoesVendedor(selecionado) {
+    const ligados = new Map(lista.usuarios.filter((u) => u.perfil === 'vendedor' && u.vendedor_id && u.ativo).map((u) => [u.vendedor_id, u.nome]));
+    $('ac-vendedor').replaceChildren(new Option('Escolha o vendedor…', ''), ...lista.vendedores.map((v) => {
+      const dono = ligados.get(v.id);
+      const rot = v.nome + ` · ${v.negocios} negócios` + (dono && v.id !== selecionado ? ` · já ligado a ${dono}` : '');
+      return new Option(rot, v.id);
+    }));
+    $('ac-vendedor').value = selecionado || '';
+  }
+  function trocaPerfil() { $('ac-vend-campo').hidden = $('ac-perfil').value !== 'vendedor'; }
+  function abre(u) {
+    editando = u || null;
+    const f = $('acesso-form');
+    f.reset(); msg('ac-msg');
+    $('acesso-form-tit').textContent = u ? 'Editar acesso de ' + u.nome : 'Novo acesso';
+    $('ac-perfil').replaceChildren(...lista.perfis.map((p) => new Option(NOMES[p], p)));
+    $('ac-nome').value = u ? u.nome : '';
+    $('ac-email').value = u ? u.email : '';
+    $('ac-perfil').value = u ? u.perfil : 'vendedor';
+    opcoesVendedor(u ? u.vendedor_id : '');
+    $('ac-senha-rot').textContent = u ? 'Nova senha' : 'Senha inicial';
+    $('ac-senha-dica').textContent = u ? 'Deixe em branco para manter a senha atual.' : 'Mínimo de 8 caracteres. Passe para a pessoa, que pode trocar em Minha conta.';
+    $('ac-ativo-campo').hidden = !u;
+    $('ac-ativo').checked = u ? u.ativo : true;
+    const proprio = u && eu && u.id === eu.id;
+    $('ac-perfil').disabled = !!proprio; $('ac-ativo').disabled = !!proprio;
+    trocaPerfil();
+    f.hidden = false;
+    $('ac-nome').focus();
+    f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function gerarSenha() {
+    const letras = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    const v = crypto.getRandomValues(new Uint32Array(10));
+    $('ac-senha').value = Array.from(v, (n) => letras[n % letras.length]).join('');
+  }
+  $('acesso-novo').addEventListener('click', () => { if (lista) abre(null); });
+  $('ac-cancelar').addEventListener('click', () => { $('acesso-form').hidden = true; editando = null; });
+  $('ac-gerar').addEventListener('click', gerarSenha);
+  $('ac-perfil').addEventListener('change', trocaPerfil);
+  $('acesso-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const corpo = { nome: $('ac-nome').value, email: $('ac-email').value, perfil: $('ac-perfil').value, vendedor_id: $('ac-vendedor').value || null };
+    const senha = $('ac-senha').value;
+    if (senha || !editando) corpo.senha = senha;
+    if (editando) corpo.ativo = $('ac-ativo').checked;
+    if (editando && editando.id === eu.id) { delete corpo.perfil; delete corpo.ativo; }
+    $('ac-salvar').disabled = true; msg('ac-msg', 'Salvando…');
+    try {
+      const salvo = editando ? await api('/api/usuarios?id=' + editando.id, 'PATCH', corpo) : await api('/api/usuarios', 'POST', corpo);
+      await carregar();
+      $('acesso-form').hidden = true;
+      const aviso = senha ? ` Senha: ${senha} (copie agora, ela não aparece de novo).` : '';
+      $('acessos-sub').textContent = (editando ? 'Acesso de ' : 'Acesso criado para ') + salvo.nome + (editando ? ' atualizado.' : ` (${salvo.email}).`) + aviso;
+      editando = null;
+    } catch (e) { msg('ac-msg', e.message, 'erro'); }
+    finally { $('ac-salvar').disabled = false; }
+  });
+
+  // ---- trocar a própria senha
+  $('conta-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const nova = $('ct-nova').value;
+    if (nova.length < 8) return msg('ct-msg', 'A nova senha precisa ter pelo menos 8 caracteres.', 'erro');
+    if (nova !== $('ct-conf').value) return msg('ct-msg', 'As duas novas senhas não são iguais.', 'erro');
+    msg('ct-msg', 'Trocando…');
+    try {
+      await api('/api/conta', 'POST', { senha_atual: $('ct-atual').value, senha_nova: nova });
+      $('conta-form').reset();
+      msg('ct-msg', 'Senha trocada.', 'ok');
+    } catch (e) { msg('ct-msg', e.message, 'erro'); }
+  });
 })();
 </script>
 </div>
