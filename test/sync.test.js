@@ -32,6 +32,8 @@ test('sincronização completa, dados do painel e incremental', async () => {
   assert.ok(d.itens.length > linhas.length, 'itens de produto vieram');
   assert.ok(d.negocios.every((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.data)));
   assert.ok(d.atualizado_em);
+  assert.equal(d.clientes.length, new Set(linhas.map((l) => l.cliente)).size, 'um registro por cliente');
+  assert.ok(d.clientes[0].documento);
   const ex = d.negocios.find((x) => x.negocio === linhas[0].negocio);
   assert.equal(ex.cliente, linhas[0].cliente.toUpperCase());
   assert.equal(ex.vendedor, linhas[0].vendedor);

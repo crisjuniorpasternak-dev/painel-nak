@@ -20,7 +20,7 @@ html, body { margin: 0; background: #f4f4f5; }
 <script>
 // Motor do painel: carrega /api/dados e oferece as funções que os gráficos usam (dash.data, dash.calc, dash.draw, filtros).
 (function () {
-  const DS = { negocios: { status: 'loading', data: [] }, itens: { status: 'loading', data: [] }, ciclo_crm: { status: 'loading', data: [] }, vendedores: { status: 'loading', data: [] } };
+  const DS = { negocios: { status: 'loading', data: [] }, itens: { status: 'loading', data: [] }, ciclo_crm: { status: 'loading', data: [] }, vendedores: { status: 'loading', data: [] }, clientes: { status: 'loading', data: [] } };
   const calcs = {}, cache = {}, draws = {}, ouvintes = [];
   const busca = new URLSearchParams(location.search);
   let params = { periodo: busca.get('periodo') || 'tudo', vendedor: busca.get('vendedor') || 'Todos' };
@@ -239,6 +239,29 @@ html, body { margin: 0; background: #f4f4f5; }
 .nk-sit-c .v { font-size: 11.5px; color: var(--nk-texto-2); display: block; font-variant-numeric: tabular-nums; }
 
 .nk-calor td.c { text-align: right; }
+.nk-clica { cursor: pointer; }
+.nk-clica:hover td { background: var(--nk-laranja-claro) !important; }
+.nk-det-fundo { position: fixed; inset: 0; background: rgba(20,20,20,.45); z-index: 50; display: flex; justify-content: flex-end; }
+.nk-det { background: var(--nk-fundo); width: min(100%, 980px); height: 100%; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+.nk-det-topo { position: sticky; top: 0; z-index: 3; background: #fff; border-bottom: 3px solid var(--nk-laranja); padding: 14px 20px; display: flex; gap: 12px; align-items: flex-start; }
+.nk-det-topo .tit { flex: 1; min-width: 0; }
+.nk-det-tipo { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; font-weight: 700; color: var(--nk-laranja-esc); }
+.nk-det h2 { margin: 2px 0 4px; font-size: 19px; color: var(--nk-preto); line-height: 1.25; }
+.nk-det-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--nk-texto-2); align-items: center; }
+.nk-det-botoes { display: flex; gap: 6px; }
+.nk-det-botoes button { font: inherit; font-size: 13px; border: 1px solid var(--nk-linha); background: #fff; border-radius: 8px; padding: 7px 11px; cursor: pointer; }
+.nk-det-botoes button:hover { border-color: var(--nk-laranja); }
+.nk-det-corpo { padding: 16px 20px 28px; display: grid; gap: 14px; }
+.nk-det-kpis { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); }
+.nk-det-kpi { background: #fff; border: 1px solid var(--nk-linha); border-radius: 10px; padding: 10px 12px; }
+.nk-det-kpi .r { font-size: 11.5px; color: var(--nk-texto-2); font-weight: 600; }
+.nk-det-kpi .v { font-size: 19px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; color: var(--nk-preto); }
+.nk-det-kpi .s { font-size: 11.5px; color: var(--nk-texto-3); margin-top: 2px; }
+.nk-det-g2 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.nk-etapa { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #ececef; color: var(--nk-texto-2); white-space: nowrap; }
+.nk-det td.txt { min-width: 7rem; }
+.nk-det th, .nk-det td { padding-left: 7px; padding-right: 7px; }
+.nk-etapa.fat { background: var(--nk-laranja-claro); color: var(--nk-laranja-esc); }
 .nk-aviso { display: grid; gap: 8px; place-content: center; text-align: center; min-height: 200px; color: var(--nk-texto-2); font-size: 13px; padding: 10px; }
 .nk-aviso strong { color: var(--nk-texto); font-size: 14px; }
 .nk-rodape { font-size: 11.5px; color: var(--nk-texto-3); padding: 0 clamp(14px, 2.4vw, 28px) 18px; }
@@ -429,7 +452,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <div class="nk-graf" data-draw="g-pareto" data-source="negocios" style="min-height:280px"></div>
     </div>
     <div class="nk-card" id="card-abc-tab">
-      <div class="nk-card-cab"><div><h3>Clientes por curva</h3><p class="nk-card-sub">Ordenados pelo faturado no período</p></div><span class="nk-cont" data-draw="abc-cont">—</span></div>
+      <div class="nk-card-cab"><div><h3>Clientes por curva</h3><p class="nk-card-sub">Ordenados pelo faturado no período · clique num cliente para ver os detalhes</p></div><span class="nk-cont" data-draw="abc-cont">—</span></div>
       <div class="nk-ferr">
         <input type="search" id="abc-busca" placeholder="Buscar cliente…" aria-label="Buscar cliente na curva ABC">
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-abc="" aria-pressed="true">Todas</button><button type="button" data-abc="A" aria-pressed="false">A</button><button type="button" data-abc="B" aria-pressed="false">B</button><button type="button" data-abc="C" aria-pressed="false">C</button></div>
@@ -451,7 +474,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <div class="nk-abc-t" style="--cor:var(--nk-c)"><div class="topo"><span class="nome">Curva C</span><span class="regra">últimos 5%</span></div><div class="grande" data-draw="prod-card" data-classe="C" data-campo="total">—</div><dl><dt>Produtos</dt><dd data-draw="prod-card" data-classe="C" data-campo="n">—</dd><dt>% dos produtos</dt><dd data-draw="prod-card" data-classe="C" data-campo="pct_n">—</dd><dt>% do faturado</dt><dd data-draw="prod-card" data-classe="C" data-campo="pct_total">—</dd></dl></div>
     </div>
     <div class="nk-card" id="card-produtos-tab">
-      <div class="nk-card-cab"><div><h3>Produtos vendidos</h3><p class="nk-card-sub">Itens dos pedidos faturados no período e vendedor escolhidos</p></div><span class="nk-cont" data-draw="prod-cont">—</span></div>
+      <div class="nk-card-cab"><div><h3>Produtos vendidos</h3><p class="nk-card-sub">Itens dos pedidos faturados no período e vendedor escolhidos · clique num produto para ver os detalhes</p></div><span class="nk-cont" data-draw="prod-cont">—</span></div>
       <div class="nk-ferr">
         <input type="search" id="prod-busca" placeholder="Buscar produto ou SKU…" aria-label="Buscar produto">
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-pabc="" aria-pressed="true">Todas</button><button type="button" data-pabc="A" aria-pressed="false">A</button><button type="button" data-pabc="B" aria-pressed="false">B</button><button type="button" data-pabc="C" aria-pressed="false">C</button></div>
@@ -480,7 +503,7 @@ html, body { margin: 0; background: #f4f4f5; }
       </div>
     </div>
     <div class="nk-card" id="card-carteira">
-      <div class="nk-card-cab"><div><h3>Carteira de clientes</h3><p class="nk-card-sub">Histórico completo de cada cliente no CRM · curva ABC sobre todo o período</p></div><span class="nk-cont" data-draw="cart-cont">—</span></div>
+      <div class="nk-card-cab"><div><h3>Carteira de clientes</h3><p class="nk-card-sub">Histórico completo de cada cliente no CRM · curva ABC sobre todo o período · clique num cliente para ver os detalhes</p></div><span class="nk-cont" data-draw="cart-cont">—</span></div>
       <div class="nk-ferr">
         <input type="search" id="cart-busca" placeholder="Buscar cliente…" aria-label="Buscar cliente na carteira">
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-cabc="" aria-pressed="true">Todas</button><button type="button" data-cabc="A" aria-pressed="false">A</button><button type="button" data-cabc="B" aria-pressed="false">B</button><button type="button" data-cabc="C" aria-pressed="false">C</button></div>
@@ -532,6 +555,16 @@ html, body { margin: 0; background: #f4f4f5; }
       </div>
     </div>
   </section>
+
+  <div class="nk-det-fundo" id="detalhe" hidden>
+    <aside class="nk-det" role="dialog" aria-modal="true" aria-labelledby="det-titulo">
+      <div class="nk-det-topo">
+        <div class="tit" data-draw="det-topo"></div>
+        <div class="nk-det-botoes"><button type="button" id="det-voltar" hidden>← Voltar</button><button type="button" id="det-fechar" aria-label="Fechar">✕ Fechar</button></div>
+      </div>
+      <div class="nk-det-corpo" data-draw="det-corpo"></div>
+    </aside>
+  </div>
 
   <footer class="nk-rodape">
     <details>
@@ -851,6 +884,8 @@ window.NK = (function () {
   function linhaTabela(tb, r, cols, key) {
     const tr = document.createElement('tr');
     if (key != null) tr.dataset.key = key;
+    if (r && r.cliente && !r.periodo) { tr.dataset.cliente = r.cliente; tr.className = 'nk-clica'; tr.title = 'Ver detalhes do cliente'; }
+    if (r && r.chave_produto) { tr.dataset.produto = r.chave_produto; tr.className = 'nk-clica'; tr.title = 'Ver detalhes do produto'; }
     for (const c of cols) {
       const td = document.createElement('td');
       if (c.cls) td.className = c.cls;
@@ -1460,7 +1495,7 @@ window.NK = (function () {
       const antes = acum / total; acum += o.total;
       const abc = antes < 0.8 ? 'A' : antes < 0.95 ? 'B' : 'C';
       tot[abc].n += 1; tot[abc].total += o.total;
-      return { pos: i + 1, sku: o.sku, produto: o.produto, abc, total: o.total, qtd: o.qtd, negocios: o.negocios.size, clientes: o.clientes.size,
+      return { pos: i + 1, chave_produto: o.sku || o.produto, sku: o.sku, produto: o.produto, abc, total: o.total, qtd: o.qtd, negocios: o.negocios.size, clientes: o.clientes.size,
         preco: o.qtd ? o.total / o.qtd : null, ticket: o.negocios.size ? o.total / o.negocios.size : null, acum: acum / total };
     });
     memo = { k, src: it.data, v: { lista, tot, total: ord.reduce((s, o) => s + o.total, 0), n: lista.length } };
@@ -1511,6 +1546,231 @@ window.NK = (function () {
 })();
 </script>
 
+<script>
+// ===================== DETALHE DE CLIENTE E DE PRODUTO =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+  const caixa = document.getElementById('detalhe');
+  let pilha = []; // histórico para o botão Voltar
+  let indice = { src: null };
+
+  function idx() {
+    const n = dash.data('negocios'), it = dash.data('itens'), cl = dash.data('clientes');
+    if (n.status !== 'ok' || it.status !== 'ok') return null;
+    if (indice.src === n.data && indice.it === it.data) return indice;
+    const porCodigo = new Map(n.data.map((r) => [r.negocio, r]));
+    const porCliente = new Map(), itensPorNeg = new Map(), itensPorProd = new Map();
+    for (const r of n.data) (porCliente.get(r.cliente) || porCliente.set(r.cliente, []).get(r.cliente)).push(r);
+    for (const i of it.data) {
+      (itensPorNeg.get(i.negocio) || itensPorNeg.set(i.negocio, []).get(i.negocio)).push(i);
+      const k = i.sku || i.produto;
+      (itensPorProd.get(k) || itensPorProd.set(k, []).get(k)).push(i);
+    }
+    const infoCliente = new Map((cl.status === 'ok' ? cl.data : []).map((c) => [c.cliente, c]));
+    indice = { src: n.data, it: it.data, porCodigo, porCliente, itensPorNeg, itensPorProd, infoCliente };
+    return indice;
+  }
+
+  function mostrar(tipo, chave) {
+    NK.det = { tipo, chave };
+    caixa.hidden = false;
+    document.querySelectorAll('#det-voltar').forEach((b) => { b.hidden = !pilha.length; });
+    document.body.style.overflow = 'hidden';
+    dash.draw('det-topo'); dash.draw('det-corpo');
+    caixa.querySelector('.nk-det').scrollTop = 0;
+  };
+  NK.abrirDetalhe = (tipo, chave, empilhar) => {
+    if (empilhar && NK.det) pilha.push(NK.det); else pilha = [];
+    mostrar(tipo, chave);
+  };
+  const fechar = () => { NK.det = null; pilha = []; caixa.hidden = true; document.body.style.overflow = ''; };
+  document.getElementById('det-fechar').addEventListener('click', fechar);
+  document.getElementById('det-voltar').addEventListener('click', () => { const ant = pilha.pop(); if (ant) mostrar(ant.tipo, ant.chave); });
+  caixa.addEventListener('click', (e) => { if (e.target === caixa) fechar(); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !caixa.hidden) fechar(); });
+  document.addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-cliente], tr[data-produto]');
+    if (!tr || !tr.closest('.nk')) return;
+    const dentro = !!tr.closest('#detalhe');
+    if (tr.dataset.cliente) NK.abrirDetalhe('cliente', tr.dataset.cliente, dentro);
+    else NK.abrirDetalhe('produto', tr.dataset.produto, dentro);
+  });
+
+  // ---------- peças ----------
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const kpi = (rot, val, sub) => { const d = el('div', 'nk-det-kpi'); d.append(el('div', 'r', rot), el('div', 'v', val)); if (sub) d.append(el('div', 's', sub)); return d; };
+  const card = (titulo, sub) => { const c = el('div', 'nk-card'); const cab = el('div', 'nk-card-cab'); const t = el('div'); t.append(el('h3', null, titulo)); if (sub) t.append(el('p', 'nk-card-sub', sub)); cab.append(t); c.append(cab); return c; };
+  function tabela(cab, linhas, cols, alturaMax) {
+    const w = el('div', 'nk-tab-wrap'); if (alturaMax) w.style.maxHeight = alturaMax;
+    const t = el('table'), th = el('thead'), tr = el('tr');
+    cab.forEach(([txt, cls]) => tr.append(el('th', cls || '', txt)));
+    th.append(tr); t.append(th);
+    const tb = el('tbody');
+    if (!linhas.length) NK.linhaTabela(tb, {}, [{ cls: 'txt', fn: () => 'Nada para mostrar.' }]);
+    for (const r of linhas) NK.linhaTabela(tb, r, cols);
+    t.append(tb); w.append(t); return w;
+  }
+  function barrasMes(box, porMes) {
+    const meses = [...porMes.keys()].sort();
+    const W = Math.max(260, box.clientWidth || 600), H = 200;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Faturado por mês');
+    if (!meses.length) return;
+    const y = d3.scaleLinear([0, d3.max(meses, (m) => porMes.get(m).v) || 1], [H - 26, 22]).nice();
+    const x = d3.scaleBand(meses, [4, W - 4]).padding(0.25);
+    svg.append('line').attr('x1', 4).attr('x2', W - 4).attr('y1', H - 26).attr('y2', H - 26).style('stroke', 'var(--nk-linha)');
+    const dc = NK.dica(box);
+    const g = svg.selectAll('g.b').data(meses).join('g').attr('class', 'b');
+    g.append('rect').attr('x', (m) => x(m)).attr('width', x.bandwidth()).attr('y', (m) => y(porMes.get(m).v)).attr('height', (m) => y(0) - y(porMes.get(m).v)).attr('rx', 3).style('fill', 'var(--nk-laranja)');
+    if (x.bandwidth() > 26) g.append('text').attr('class', 'rot').attr('x', (m) => x(m) + x.bandwidth() / 2).attr('y', (m) => y(porMes.get(m).v) - 6).attr('text-anchor', 'middle').style('font-size', '11px').text((m) => (porMes.get(m).v ? F.curto(porMes.get(m).v) : ''));
+    const passo = Math.max(1, Math.ceil(44 / x.step()));
+    g.filter((m, i) => i % passo === 0).append('text').attr('class', 'eixo-t').attr('x', (m) => x(m) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').style('fill', 'var(--nk-texto-3)').text((m) => F.mes(m));
+    g.append('rect').attr('x', (m) => x(m)).attr('width', x.step()).attr('y', 0).attr('height', H - 26).style('fill', 'transparent')
+      .on('mousemove', (ev, m) => dc.mostra(ev, F.mesLongo(m), [F.brl(porMes.get(m).v), F.int(porMes.get(m).n) + ' pedidos']))
+      .on('mouseleave', () => dc.esconde());
+  }
+  const etapa = (r) => el('span', 'nk-etapa' + (r.etapa === 'Faturado' ? ' fat' : ''), r.etapa);
+  const D = (s) => Date.parse(s + 'T00:00:00Z') / 864e5;
+
+  // ---------- desenho ----------
+  dash.draw('det-topo', (box) => {
+    box.replaceChildren();
+    const d = NK.det, ix = idx();
+    if (!d || !ix) return;
+    if (d.tipo === 'cliente') {
+      const info = ix.infoCliente.get(d.chave) || {};
+      const cart = (dash.data('c_clientes').data || []).find((c) => c.cliente === d.chave) || {};
+      box.append(el('div', 'nk-det-tipo', 'Cliente'));
+      const h = el('h2', null, d.chave); h.id = 'det-titulo'; box.append(h);
+      const m = el('div', 'nk-det-meta');
+      if (cart.abc) m.append(NK.pill(cart.abc));
+      if (cart.situacao) m.append(NK.sit(cart.situacao));
+      if (cart.vendedor) m.append(el('span', null, 'Vendedor: ' + cart.vendedor));
+      if (info.documento) m.append(el('span', null, 'CNPJ/CPF ' + info.documento));
+      if (info.cidade) m.append(el('span', null, info.cidade + (info.uf ? '/' + info.uf : '')));
+      if (info.telefone) m.append(el('span', null, info.telefone));
+      if (info.email) m.append(el('span', null, info.email));
+      box.append(m);
+    } else {
+      const itens = ix.itensPorProd.get(d.chave) || [];
+      const nome = itens[0] ? itens[0].produto : d.chave;
+      box.append(el('div', 'nk-det-tipo', 'Produto'));
+      const h = el('h2', null, nome); h.id = 'det-titulo'; box.append(h);
+      const m = el('div', 'nk-det-meta');
+      if (itens[0] && itens[0].sku) m.append(el('span', null, 'SKU ' + itens[0].sku));
+      const p = NK.produtos && NK.produtos();
+      const lin = p && p.lista.find((r) => r.chave_produto === d.chave);
+      if (lin) { m.append(NK.pill(lin.abc)); m.append(el('span', null, `${lin.pos}º produto do período`)); }
+      box.append(m);
+    }
+  });
+
+  dash.draw('det-corpo', (box) => {
+    box.replaceChildren();
+    const d = NK.det, ix = idx();
+    if (!d) return;
+    if (!ix) { box.append(el('p', 'nk-cont', 'Carregando…')); return; }
+    if (d.tipo === 'cliente') corpoCliente(box, d.chave, ix); else corpoProduto(box, d.chave, ix);
+  });
+
+  function corpoCliente(box, cliente, ix) {
+    const negs = (ix.porCliente.get(cliente) || []).slice().sort((a, b) => (b.data || '').localeCompare(a.data || '') || b.negocio - a.negocio);
+    const fat = negs.filter((r) => r.etapa === 'Faturado' && r.status !== 'lost' && r.valor > 0);
+    const abertos = negs.filter((r) => r.etapa !== 'Faturado' && r.status !== 'lost');
+    const receita = d3.sum(fat, (r) => r.valor), dias = [...new Set(fat.map((r) => r.data))].sort();
+    const ref = (dash.data('c_periodos').data || []).find((p) => p.id === 'tudo')?.fim;
+    const sem = dias.length && ref ? Math.round(D(ref) - D(dias[dias.length - 1])) : null;
+    const k = el('div', 'nk-det-kpis');
+    k.append(
+      kpi('Faturado', F.brlK(receita), F.int(fat.length) + ' pedidos'),
+      kpi('Ticket médio', F.brl(fat.length ? receita / fat.length : null)),
+      kpi('Em aberto', F.brlK(d3.sum(abertos, (r) => r.valor)), F.int(abertos.length) + ' negócios'),
+      kpi('Negociações', F.int(negs.length), 'todas as etapas'),
+      kpi('Primeira compra', F.data(dias[0])),
+      kpi('Última compra', F.data(dias[dias.length - 1]), sem == null ? '' : F.dias(sem) + ' atrás'),
+      kpi('Recompra a cada', dias.length > 1 ? F.dias(Math.round((D(dias[dias.length - 1]) - D(dias[0])) / (dias.length - 1))) : '—', 'média entre compras'),
+    );
+    box.append(k);
+
+    const g2 = el('div', 'nk-det-g2');
+    const cm = card('Faturado por mês', 'Todo o histórico do cliente');
+    const gm = el('div', 'nk-graf'); gm.style.minHeight = '200px'; cm.append(gm);
+    const porMes = new Map();
+    for (const r of fat) { const m = r.data.slice(0, 7); const o = porMes.get(m) || { v: 0, n: 0 }; o.v += r.valor; o.n += 1; porMes.set(m, o); }
+    g2.append(cm);
+
+    const prods = new Map();
+    for (const r of fat) for (const i of ix.itensPorNeg.get(r.negocio) || []) {
+      const ch = i.sku || i.produto;
+      const o = prods.get(ch) || { chave_produto: ch, produto: i.produto, sku: i.sku, qtd: 0, total: 0, pedidos: new Set(), ultima: '' };
+      o.qtd += i.qtd || 0; o.total += i.total || 0; o.pedidos.add(r.negocio); if (r.data > o.ultima) o.ultima = r.data;
+      prods.set(ch, o);
+    }
+    const lp = [...prods.values()].sort((a, b) => b.total - a.total);
+    const cp = card('Produtos que mais compra', `${F.int(lp.length)} produtos diferentes · clique para ver o produto`);
+    cp.append(tabela([['Produto', 'txt'], ['Pedidos'], ['Qtd.'], ['Total'], ['Última']], lp, [
+      { cls: 'txt', fn: (r) => r.produto + (r.sku ? ' · ' + r.sku : '') }, { fn: (r) => F.int(r.pedidos.size) }, { fn: (r) => F.int(r.qtd) },
+      { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px'));
+    g2.append(cp);
+    box.append(g2);
+    barrasMes(gm, porMes);
+
+    const cn = card('Negociações', 'Todos os negócios do cliente no funil de vendas, do mais recente para o mais antigo');
+    cn.append(tabela([['Data', 'txt'], ['Nº'], ['Pedido Omie'], ['Etapa', 'txt'], ['Vendedor', 'txt esconde-estreito'], ['Itens'], ['Valor']],
+      negs.map((r) => ({ ...r, cliente: undefined })), [
+        { cls: 'txt', fn: (r) => F.data(r.data) }, { fn: (r) => r.negocio }, { fn: (r) => r.pedido || '—' }, { cls: 'txt', fn: etapa },
+        { cls: 'txt esconde-estreito', fn: (r) => r.vendedor }, { fn: (r) => F.int(r.itens) }, { cls: 'forte', fn: (r) => F.brl(r.valor) }], '420px'));
+    box.append(cn);
+  }
+
+  function corpoProduto(box, chave, ix) {
+    const linhas = [];
+    for (const i of ix.itensPorProd.get(chave) || []) {
+      const r = ix.porCodigo.get(i.negocio);
+      if (r && r.etapa === 'Faturado' && r.status !== 'lost') linhas.push({ ...i, data: r.data, cliente: r.cliente, vendedor: r.vendedor });
+    }
+    linhas.sort((a, b) => b.data.localeCompare(a.data));
+    const total = d3.sum(linhas, (l) => l.total), qtd = d3.sum(linhas, (l) => l.qtd);
+    const pedidos = new Set(linhas.map((l) => l.negocio)).size;
+    const porCli = new Map();
+    for (const l of linhas) {
+      const o = porCli.get(l.cliente) || { cliente: l.cliente, qtd: 0, total: 0, pedidos: new Set(), ultima: '' };
+      o.qtd += l.qtd; o.total += l.total; o.pedidos.add(l.negocio); if (l.data > o.ultima) o.ultima = l.data;
+      porCli.set(l.cliente, o);
+    }
+    const clientes = [...porCli.values()].sort((a, b) => b.total - a.total);
+    const k = el('div', 'nk-det-kpis');
+    k.append(
+      kpi('Faturado', F.brlK(total), 'todo o histórico'),
+      kpi('Quantidade vendida', F.int(qtd)),
+      kpi('Pedidos', F.int(pedidos)),
+      kpi('Clientes', F.int(clientes.length), clientes.length ? `${F.int(clientes.filter((c) => c.pedidos.size > 1).length)} compraram mais de uma vez` : ''),
+      kpi('Preço médio', F.brl(qtd ? total / qtd : null), 'por unidade'),
+      kpi('Última venda', F.data(linhas[0]?.data)),
+    );
+    box.append(k);
+
+    const g2 = el('div', 'nk-det-g2');
+    const cm = card('Faturado por mês', 'Todo o histórico do produto');
+    const gm = el('div', 'nk-graf'); gm.style.minHeight = '200px'; cm.append(gm);
+    g2.append(cm);
+    const cc = card('Clientes que mais compram', 'Clique para ver o cliente');
+    cc.append(tabela([['Cliente', 'txt'], ['Pedidos'], ['Qtd.'], ['Total'], ['Última']], clientes, [
+      { cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => F.int(r.pedidos.size) }, { fn: (r) => F.int(r.qtd) }, { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px'));
+    g2.append(cc);
+    box.append(g2);
+    const porMes = new Map();
+    for (const l of linhas) { const m = l.data.slice(0, 7); const o = porMes.get(m) || { v: 0, n: new Set() }; o.v += l.total; o.n.add(l.negocio); porMes.set(m, o); }
+    for (const o of porMes.values()) o.n = o.n.size;
+    barrasMes(gm, porMes);
+
+    const cv = card('Vendas do produto', 'Pedidos faturados com este produto, do mais recente para o mais antigo');
+    cv.append(tabela([['Data', 'txt'], ['Nº'], ['Cliente', 'txt'], ['Vendedor', 'txt esconde-estreito'], ['Qtd.'], ['Total']], linhas.slice(0, 300), [
+      { cls: 'txt', fn: (r) => F.data(r.data) }, { fn: (r) => r.negocio }, { cls: 'txt', fn: (r) => r.cliente }, { cls: 'txt esconde-estreito', fn: (r) => r.vendedor },
+      { fn: (r) => F.int(r.qtd) }, { cls: 'forte', fn: (r) => F.brl(r.total) }], '420px'));
+    box.append(cv);
+  }
+})();
+</script>
 </div>
 </body>
 </html>

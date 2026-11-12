@@ -17,6 +17,11 @@ const srv = http.createServer((req, res) => {
   for (const t of ['produtos', 'vendedores', 'carteira']) { await p.click('#aba-' + t); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_' + t + '.png', fullPage: true }); }
   await p.selectOption('#f-periodo', '30d'); await p.waitForTimeout(300);
   await p.click('#aba-produtos'); await p.waitForTimeout(300); await p.screenshot({ path: out + '/v_produtos30.png', fullPage: true });
+  await p.click('#t-produtos tr[data-produto]'); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_det_produto.png' });
+  await p.click('#detalhe tr[data-cliente]'); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_det_cliente.png' });
+  console.log('voltar visível:', await p.isVisible('#det-voltar'));
+  await p.click('#det-voltar'); await p.waitForTimeout(200); console.log('tipo após voltar:', await p.textContent('.nk-det-tipo'));
+  await p.keyboard.press('Escape'); console.log('fechou:', await p.isHidden('#detalhe'));
   console.log('erros:', JSON.stringify(errs));
   await b.close(); srv.close();
 });
