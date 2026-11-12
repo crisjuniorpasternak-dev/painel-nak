@@ -194,8 +194,13 @@ html, body { margin: 0; background: #f4f4f5; }
 .nk th { position: sticky; top: 0; background: #fff; color: var(--nk-texto-3); font-weight: 600; font-size: 11.5px; text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--nk-linha); white-space: nowrap; z-index: 1; }
 .nk th.txt, .nk td.txt { text-align: left; }
 .nk th button { all: unset; cursor: pointer; }
-.nk th[aria-sort="descending"] button::after { content: " ↓"; color: var(--nk-laranja); }
-.nk th[aria-sort="ascending"] button::after { content: " ↑"; color: var(--nk-laranja); }
+.nk table[data-ord] th { cursor: pointer; user-select: none; }
+.nk table[data-ord] th::after { content: " ↕"; color: var(--nk-c); font-weight: 400; }
+.nk table[data-ord] th:hover { color: var(--nk-texto); }
+.nk table[data-ord] th:hover::after { color: var(--nk-laranja); }
+.nk table[data-ord] th[aria-sort="descending"]::after { content: " ↓"; color: var(--nk-laranja); font-weight: 700; }
+.nk table[data-ord] th[aria-sort="ascending"]::after { content: " ↑"; color: var(--nk-laranja); font-weight: 700; }
+.nk table[data-ord] th[aria-sort] { color: var(--nk-texto); }
 .nk td { padding: 9px 10px; border-bottom: 1px solid var(--nk-linha); text-align: right; white-space: nowrap; color: var(--nk-texto); }
 .nk td.txt { white-space: normal; min-width: 12rem; }
 .nk tbody tr:hover td { background: #fafafa; }
@@ -372,7 +377,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <div class="nk-card nk-s6" id="card-atendentes">
         <div class="nk-card-cab"><div><h3>Vendedores com mais vendas</h3><p class="nk-card-sub">Pedidos faturados no período</p></div></div>
         <div class="nk-tab-wrap" style="max-height:420px">
-          <table id="t-atendentes" data-source="c_vend" data-row-key="periodo,vendedor">
+          <table id="t-atendentes" data-ord="t-atendentes" data-ord-draw="t-atendentes" data-source="c_vend" data-row-key="periodo,vendedor">
             <thead><tr><th class="txt" data-field="vendedor">Vendedor</th><th data-field="fat_n">Negócios</th><th data-field="ticket">Ticket médio</th><th data-field="fat_valor">Total</th></tr></thead>
             <tbody data-draw="t-atendentes"></tbody>
           </table>
@@ -381,7 +386,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <div class="nk-card nk-s6" id="card-top-clientes">
         <div class="nk-card-cab"><div><h3>Clientes que mais compraram</h3><p class="nk-card-sub">Os 10 maiores no período e vendedor escolhidos</p></div></div>
         <div class="nk-tab-wrap" style="max-height:420px">
-          <table id="t-top">
+          <table id="t-top" data-ord="t-top" data-ord-draw="t-top">
             <thead><tr><th class="txt">Cliente</th><th>Pedidos</th><th>Ticket médio</th><th>Total</th></tr></thead>
             <tbody data-draw="t-top" data-source="negocios"></tbody>
           </table>
@@ -390,7 +395,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <div class="nk-card nk-s12" id="card-produtos">
         <div class="nk-card-cab"><div><h3>Produtos mais vendidos</h3><p class="nk-card-sub">Os 10 de maior valor faturado no período e vendedor escolhidos</p></div></div>
         <div class="nk-tab-wrap" style="max-height:460px">
-          <table id="t-prod-top">
+          <table id="t-prod-top" data-ord="t-prod-top" data-ord-draw="t-prod-top">
             <thead><tr><th class="txt">Produto</th><th>Negócios</th><th>Quantidade</th><th>Ticket médio</th><th>Total</th></tr></thead>
             <tbody data-draw="t-prod-top"></tbody>
           </table>
@@ -402,19 +407,19 @@ html, body { margin: 0; background: #f4f4f5; }
   <!-- ===================== VENDEDORES ===================== -->
   <section class="nk-pagina" id="vendedores" role="tabpanel" aria-labelledby="aba-vendedores" hidden>
     <div class="nk-card" id="card-vend">
-      <div class="nk-card-cab"><div><h3>Resultado por vendedor</h3><p class="nk-card-sub">No período escolhido · clique no título de uma coluna para ordenar</p></div></div>
+      <div class="nk-card-cab"><div><h3>Resultado por vendedor</h3><p class="nk-card-sub">No período escolhido · clique no título de qualquer coluna para ordenar</p></div></div>
       <div class="nk-tab-wrap">
-        <table id="t-vend" data-source="c_vend" data-row-key="periodo,vendedor">
+        <table id="t-vend" data-ord="t-vend" data-ord-draw="t-vend" data-source="c_vend" data-row-key="periodo,vendedor">
           <thead><tr>
-            <th class="txt" data-field="vendedor"><button type="button">Vendedor</button></th>
-            <th data-field="fat_valor" aria-sort="descending"><button type="button">Faturado</button></th>
-            <th data-field="pct"><button type="button">Participação</button></th>
-            <th data-field="fat_n"><button type="button">Pedidos</button></th>
-            <th data-field="ticket"><button type="button">Ticket médio</button></th>
-            <th data-field="clientes"><button type="button">Clientes</button></th>
-            <th data-field="aberto_n" class="esconde-estreito"><button type="button">Em aberto</button></th>
-            <th data-field="aberto_valor" class="esconde-estreito"><button type="button">Valor em aberto</button></th>
-            <th data-field="conv"><button type="button">Fechamento</button></th>
+            <th class="txt" data-field="vendedor">Vendedor</th>
+            <th data-field="fat_valor" aria-sort="descending">Faturado</th>
+            <th data-field="pct">Participação</th>
+            <th data-field="fat_n">Pedidos</th>
+            <th data-field="ticket">Ticket médio</th>
+            <th data-field="clientes">Clientes</th>
+            <th data-field="aberto_n" class="esconde-estreito">Em aberto</th>
+            <th data-field="aberto_valor" class="esconde-estreito">Valor em aberto</th>
+            <th data-field="conv">Fechamento</th>
           </tr></thead>
           <tbody data-draw="t-vend"></tbody>
         </table>
@@ -423,7 +428,7 @@ html, body { margin: 0; background: #f4f4f5; }
     <div class="nk-card" id="card-vend-mes">
       <div class="nk-card-cab"><div><h3>Faturado por vendedor e mês</h3><p class="nk-card-sub">Todos os meses com dados · quanto mais forte o laranja, maior o valor</p></div></div>
       <div class="nk-tab-wrap">
-        <table class="nk-calor" id="t-calor" data-draw="t-calor" data-source="negocios"></table>
+        <table class="nk-calor" id="t-calor" data-draw="t-calor" data-ord="t-calor" data-ord-draw="t-calor" data-source="negocios"></table>
       </div>
     </div>
   </section>
@@ -458,7 +463,7 @@ html, body { margin: 0; background: #f4f4f5; }
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-abc="" aria-pressed="true">Todas</button><button type="button" data-abc="A" aria-pressed="false">A</button><button type="button" data-abc="B" aria-pressed="false">B</button><button type="button" data-abc="C" aria-pressed="false">C</button></div>
       </div>
       <div class="nk-tab-wrap">
-        <table id="t-abc">
+        <table id="t-abc" data-ord="t-abc" data-ord-draw="t-abc">
           <thead><tr><th>#</th><th class="txt">Cliente</th><th>Curva</th><th>Faturado</th><th>% do total</th><th>% acumulado</th><th>Pedidos</th><th class="esconde-estreito">Ticket médio</th><th class="txt esconde-estreito">Vendedor</th></tr></thead>
           <tbody data-draw="t-abc" data-source="negocios"></tbody>
         </table>
@@ -480,7 +485,7 @@ html, body { margin: 0; background: #f4f4f5; }
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-pabc="" aria-pressed="true">Todas</button><button type="button" data-pabc="A" aria-pressed="false">A</button><button type="button" data-pabc="B" aria-pressed="false">B</button><button type="button" data-pabc="C" aria-pressed="false">C</button></div>
       </div>
       <div class="nk-tab-wrap">
-        <table id="t-produtos">
+        <table id="t-produtos" data-ord="t-produtos" data-ord-draw="t-produtos">
           <thead><tr><th>#</th><th class="txt">Produto</th><th>Curva</th><th>Negócios</th><th>Clientes</th><th>Quantidade</th><th class="esconde-estreito">Preço médio</th><th>Total</th><th>% acumulado</th></tr></thead>
           <tbody data-draw="t-produtos"></tbody>
         </table>
@@ -509,19 +514,19 @@ html, body { margin: 0; background: #f4f4f5; }
         <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-cabc="" aria-pressed="true">Todas</button><button type="button" data-cabc="A" aria-pressed="false">A</button><button type="button" data-cabc="B" aria-pressed="false">B</button><button type="button" data-cabc="C" aria-pressed="false">C</button></div>
       </div>
       <div class="nk-tab-wrap">
-        <table id="t-carteira" data-source="c_clientes" data-row-key="cliente">
+        <table id="t-carteira" data-ord="t-carteira" data-ord-draw="t-carteira" data-source="c_clientes" data-row-key="cliente">
           <thead><tr>
-            <th class="txt" data-field="cliente"><button type="button">Cliente</button></th>
-            <th class="txt esconde-estreito" data-field="vendedor"><button type="button">Vendedor</button></th>
-            <th data-field="abc"><button type="button">Curva</button></th>
-            <th data-field="receita" aria-sort="descending"><button type="button">Faturado</button></th>
-            <th data-field="pedidos"><button type="button">Pedidos</button></th>
-            <th data-field="ticket" class="esconde-estreito"><button type="button">Ticket médio</button></th>
-            <th data-field="ultima"><button type="button">Última compra</button></th>
-            <th data-field="dias"><button type="button">Dias sem comprar</button></th>
-            <th data-field="ciclo_medio" class="esconde-estreito"><button type="button">Recompra a cada</button></th>
-            <th class="txt" data-field="situacao"><button type="button">Situação</button></th>
-            <th data-field="aberto_valor" class="esconde-estreito"><button type="button">Em aberto</button></th>
+            <th class="txt" data-field="cliente">Cliente</th>
+            <th class="txt esconde-estreito" data-field="vendedor">Vendedor</th>
+            <th data-field="abc">Curva</th>
+            <th data-field="receita" aria-sort="descending">Faturado</th>
+            <th data-field="pedidos">Pedidos</th>
+            <th data-field="ticket" class="esconde-estreito">Ticket médio</th>
+            <th data-field="ultima">Última compra</th>
+            <th data-field="dias">Dias sem comprar</th>
+            <th data-field="ciclo_medio" class="esconde-estreito">Recompra a cada</th>
+            <th class="txt" data-field="situacao">Situação</th>
+            <th data-field="aberto_valor" class="esconde-estreito">Em aberto</th>
           </tr></thead>
           <tbody data-draw="t-carteira"></tbody>
         </table>
@@ -906,6 +911,36 @@ window.NK = (function () {
     });
   }
 
+  // Ordenação pelo cabeçalho: o estado guarda o índice da coluna e a direção, por tabela.
+  const ord = { 't-vend': { i: 1, dir: 'desc' }, 't-carteira': { i: 3, dir: 'desc' }, 't-atendentes': { i: 3, dir: 'desc' } };
+  function campoDe(col) {
+    if (col.o) return col.o;
+    if (col._o === undefined) { const m = String(col.fn).match(/\br\.(\w+)/); col._o = m ? m[1] : null; }
+    return col._o;
+  }
+  function ordPor(linhas, val, dir) {
+    const s = dir === 'asc' ? 1 : -1, vazio = (x) => x == null || x === '' || x === '—';
+    return [...linhas].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (vazio(x)) return vazio(y) ? 0 : 1; if (vazio(y)) return -1;
+      return typeof x === 'number' && typeof y === 'number' ? (x - y) * s : String(x).localeCompare(String(y), 'pt-BR', { numeric: true }) * s;
+    });
+  }
+  function ordCols(linhas, cols, chaveTab) {
+    const st = ord[chaveTab];
+    if (!st || !cols[st.i]) return linhas;
+    const c = campoDe(cols[st.i]);
+    if (!c) return linhas;
+    return ordPor(linhas, typeof c === 'function' ? c : (r) => { const v = r[c]; return v instanceof Set ? v.size : v; }, st.dir);
+  }
+  function marcaOrd(tabela) {
+    const st = ord[tabela.dataset.ord];
+    tabela.querySelectorAll('thead th').forEach((th, i) => {
+      if (st && st.i === i) th.setAttribute('aria-sort', st.dir === 'desc' ? 'descending' : 'ascending'); else th.removeAttribute('aria-sort');
+      th.tabIndex = 0; th.title = 'Clique para ordenar (crescente ou decrescente)';
+    });
+  }
+
   function pill(c) { const s = document.createElement('span'); s.className = 'nk-pill ' + (c === '—' ? 'X' : c); s.textContent = c === '—' ? 'sem compra' : c; return s; }
   function sit(c) { const s = document.createElement('span'); s.className = 'nk-sit'; s.style.setProperty('--cor', corSit[c]); s.textContent = c; return s; }
 
@@ -938,7 +973,7 @@ window.NK = (function () {
     return memo.v;
   }
 
-  return { f, D, soma, segunda, cores, corSit, filtro, per, w, chave, falha, dica, medeTexto, linhaTabela, ordena, pill, sit, abc,
+  return { f, D, soma, segunda, cores, corSit, filtro, per, w, chave, falha, dica, medeTexto, linhaTabela, ordena, ord, ordCols, ordPor, marcaOrd, pill, sit, abc,
     med: { 'g-diario': 'valor', 'g-donut': 'valor', 'g-mensal': 'valor' },
     lim: { 't-abc': 50, 't-carteira': 50 },
     busca: { 't-abc': '', 't-carteira': '' },
@@ -994,15 +1029,22 @@ window.NK = (function () {
     window.NK.lim['t-carteira'] = 50; dash.draw('t-carteira');
   }));
 
-  for (const id of ['t-vend', 't-carteira']) {
-    document.querySelectorAll('#' + id + ' th[data-field] button').forEach((b) => b.addEventListener('click', () => {
-      const th = b.closest('th'), est = window.NK.sort[id], f = th.dataset.field;
-      est.dir = est.f === f && est.dir === 'desc' ? 'asc' : 'desc'; est.f = f;
-      th.closest('tr').querySelectorAll('th').forEach((x) => x.removeAttribute('aria-sort'));
-      th.setAttribute('aria-sort', est.dir === 'desc' ? 'descending' : 'ascending');
-      dash.draw(id);
-    }));
+  function clicaOrd(th) {
+    const tabela = th.closest('table[data-ord]');
+    if (!tabela || !th.closest('thead')) return;
+    const k = tabela.dataset.ord, i = th.cellIndex, st = window.NK.ord[k];
+    const primeira = th.classList.contains('txt') ? 'asc' : 'desc';
+    window.NK.ord[k] = st && st.i === i ? { i, dir: st.dir === 'desc' ? 'asc' : 'desc' } : { i, dir: primeira };
+    window.NK.marcaOrd(tabela);
+    dash.draw(tabela.dataset.ordDraw);
   }
+  document.addEventListener('click', (e) => { const th = e.target.closest('.nk table[data-ord] thead th'); if (th) clicaOrd(th); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const th = e.target.closest && e.target.closest('.nk table[data-ord] thead th');
+    if (th && e.target === th) { e.preventDefault(); clicaOrd(th); }
+  });
+  document.querySelectorAll('.nk table[data-ord]').forEach((t) => window.NK.marcaOrd(t));
 })();
 </script>
 
@@ -1179,7 +1221,7 @@ window.NK = (function () {
       { fn: (r) => F.brlK(r.ticket) },
       { cls: 'verde', fn: (r) => F.brlK(r.fat_valor) },
     ];
-    for (const r of rows) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
+    for (const r of NK.ordCols(rows, cols, 't-atendentes')) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
   });
 
   dash.draw('t-top', (tb) => {
@@ -1188,7 +1230,7 @@ window.NK = (function () {
     const res = NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor);
     tb.replaceChildren();
     const cols = [{ cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => F.int(r.pedidos) }, { fn: (r) => F.brlK(r.ticket) }, { cls: 'verde', fn: (r) => F.brlK(r.receita) }];
-    for (const r of res.lista.slice(0, 10)) NK.linhaTabela(tb, r, cols);
+    for (const r of NK.ordCols(res.lista.slice(0, 10), cols, 't-top')) NK.linhaTabela(tb, r, cols);
   });
 })();
 </script>
@@ -1202,7 +1244,7 @@ window.NK = (function () {
     const d = dash.data('c_vend');
     if (NK.falha(tb, [d], true)) return;
     const { periodo, vendedor } = NK.filtro();
-    const rows = NK.ordena(d.data.filter((r) => r.periodo === periodo && (r.fat_n > 0 || r.aberto_n > 0)), NK.sort['t-vend']);
+    const rows = d.data.filter((r) => r.periodo === periodo && (r.fat_n > 0 || r.aberto_n > 0));
     const max = d3.max(rows, (r) => r.fat_valor) || 1;
     tb.replaceChildren();
     const cols = [
@@ -1216,7 +1258,7 @@ window.NK = (function () {
       { cls: 'esconde-estreito', fn: (r) => F.brl(r.aberto_valor) },
       { fn: (r) => F.pct(r.conv) },
     ];
-    for (const r of rows) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
+    for (const r of NK.ordCols(rows, cols, 't-vend')) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
   });
 
   dash.draw('t-calor', (tab) => {
@@ -1226,13 +1268,15 @@ window.NK = (function () {
     const meses = [...new Set(d.data.map((r) => r.mes))].sort();
     const por = new Map();
     for (const r of linhas) { const o = por.get(r.vendedor) || { vendedor: r.vendedor, total: 0, m: {} }; o.m[r.mes] = r.fat_valor; o.total += r.fat_valor; por.set(r.vendedor, o); }
-    const rows = [...por.values()].filter((o) => o.total > 0).sort((a, b) => b.total - a.total);
+    let rows = [...por.values()].filter((o) => o.total > 0).sort((a, b) => b.total - a.total);
+    const st = NK.ord['t-calor'];
+    if (st) rows = NK.ordPor(rows, (o) => (st.i === 0 ? o.vendedor : st.i > meses.length ? o.total : o.m[meses[st.i - 1]] || 0), st.dir);
     const max = d3.max(rows, (o) => d3.max(meses, (m) => o.m[m] || 0)) || 1;
     tab.replaceChildren();
     const th = (t, cls) => { const e = document.createElement('th'); if (cls) e.className = cls; e.textContent = t; return e; };
     const thead = document.createElement('thead'), tr = document.createElement('tr');
     tr.append(th('Vendedor', 'txt'), ...meses.map((m) => th(F.mes(m))), th('Total'));
-    thead.appendChild(tr); tab.appendChild(thead);
+    thead.appendChild(tr); tab.appendChild(thead); NK.marcaOrd(tab);
     const tbody = document.createElement('tbody');
     const { vendedor } = NK.filtro();
     for (const o of rows) {
@@ -1328,7 +1372,7 @@ window.NK = (function () {
       { fn: (r) => F.pct(r.pct, 2) }, { fn: (r) => F.pct(r.acum) }, { fn: (r) => F.int(r.pedidos) }, { cls: 'esconde-estreito', fn: (r) => F.brl(r.ticket) },
       { cls: 'txt esconde-estreito', fn: (r) => r.vendedor },
     ];
-    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols);
+    for (const r of NK.ordCols(rows, cols, 't-abc').slice(0, lim)) NK.linhaTabela(tb, r, cols);
     document.querySelectorAll('#abc-mais').forEach((b) => { b.hidden = rows.length <= lim; });
   });
 })();
@@ -1360,7 +1404,7 @@ window.NK = (function () {
   dash.draw('t-carteira', (tb) => {
     const d = dash.data('c_clientes');
     if (NK.falha(tb, [d], true)) return;
-    const rows = NK.ordena(filtrados(d), NK.sort['t-carteira']);
+    const rows = filtrados(d);
     const lim = NK.lim['t-carteira'];
     tb.replaceChildren();
     const cols = [
@@ -1370,7 +1414,7 @@ window.NK = (function () {
       { cls: 'esconde-estreito', fn: (r) => (r.ciclo_medio == null ? '—' : F.dias(r.ciclo_medio)) },
       { cls: 'txt', fn: (r) => NK.sit(r.situacao) }, { cls: 'esconde-estreito', fn: (r) => (r.aberto_valor ? F.brl(r.aberto_valor) : '—') },
     ];
-    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols, NK.chave(r.cliente));
+    for (const r of NK.ordCols(rows, cols, 't-carteira').slice(0, lim)) NK.linhaTabela(tb, r, cols, NK.chave(r.cliente));
     document.querySelectorAll('#cart-mais').forEach((b) => { b.hidden = rows.length <= lim; });
   });
 
@@ -1514,7 +1558,7 @@ window.NK = (function () {
     if (!res) return;
     if (!res.n) { NK.linhaTabela(tb, {}, [{ cls: 'txt', fn: () => 'Nenhum item de pedido faturado neste período.' }]); return; }
     const cols = [{ cls: 'txt', fn: nomeProduto }, { fn: (r) => F.int(r.negocios) }, { fn: (r) => F.int(r.qtd) }, { fn: (r) => F.brlK(r.ticket) }, { cls: 'verde', fn: (r) => F.brlK(r.total) }];
-    for (const r of res.lista.slice(0, 10)) NK.linhaTabela(tb, r, cols);
+    for (const r of NK.ordCols(res.lista.slice(0, 10), cols, 't-prod-top')) NK.linhaTabela(tb, r, cols);
   });
 
   dash.draw('prod-card', (el) => {
@@ -1534,7 +1578,7 @@ window.NK = (function () {
     const rows = res.lista.filter((r) => (!cl || r.abc === cl) && (!q || String(r.produto).toUpperCase().includes(q) || String(r.sku).toUpperCase().includes(q)));
     const cols = [{ fn: (r) => F.int(r.pos) }, { cls: 'txt', fn: nomeProduto }, { fn: (r) => NK.pill(r.abc) }, { fn: (r) => F.int(r.negocios) }, { fn: (r) => F.int(r.clientes) },
       { fn: (r) => F.int(r.qtd) }, { cls: 'esconde-estreito', fn: (r) => F.brl(r.preco) }, { cls: 'forte', fn: (r) => F.brl(r.total) }, { fn: (r) => F.pct(r.acum) }];
-    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols);
+    for (const r of NK.ordCols(rows, cols, 't-produtos').slice(0, lim)) NK.linhaTabela(tb, r, cols);
     document.querySelectorAll('#prod-mais').forEach((b) => { b.hidden = rows.length <= lim; });
   });
 
@@ -1600,11 +1644,12 @@ window.NK = (function () {
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const kpi = (rot, val, sub) => { const d = el('div', 'nk-det-kpi'); d.append(el('div', 'r', rot), el('div', 'v', val)); if (sub) d.append(el('div', 's', sub)); return d; };
   const card = (titulo, sub) => { const c = el('div', 'nk-card'); const cab = el('div', 'nk-card-cab'); const t = el('div'); t.append(el('h3', null, titulo)); if (sub) t.append(el('p', 'nk-card-sub', sub)); cab.append(t); c.append(cab); return c; };
-  function tabela(cab, linhas, cols, alturaMax) {
+  function tabela(cab, linhas, cols, alturaMax, chaveOrd) {
     const w = el('div', 'nk-tab-wrap'); if (alturaMax) w.style.maxHeight = alturaMax;
     const t = el('table'), th = el('thead'), tr = el('tr');
     cab.forEach(([txt, cls]) => tr.append(el('th', cls || '', txt)));
     th.append(tr); t.append(th);
+    if (chaveOrd) { t.dataset.ord = chaveOrd; t.dataset.ordDraw = 'det-corpo'; NK.marcaOrd(t); linhas = NK.ordCols(linhas, cols, chaveOrd); }
     const tb = el('tbody');
     if (!linhas.length) NK.linhaTabela(tb, {}, [{ cls: 'txt', fn: () => 'Nada para mostrar.' }]);
     for (const r of linhas) NK.linhaTabela(tb, r, cols);
@@ -1665,11 +1710,13 @@ window.NK = (function () {
   });
 
   dash.draw('det-corpo', (box) => {
+    const rolagem = box.parentElement.scrollTop;
     box.replaceChildren();
     const d = NK.det, ix = idx();
     if (!d) return;
     if (!ix) { box.append(el('p', 'nk-cont', 'Carregando…')); return; }
     if (d.tipo === 'cliente') corpoCliente(box, d.chave, ix); else corpoProduto(box, d.chave, ix);
+    box.parentElement.scrollTop = rolagem;
   });
 
   function corpoCliente(box, cliente, ix) {
@@ -1709,7 +1756,7 @@ window.NK = (function () {
     const cp = card('Produtos que mais compra', `${F.int(lp.length)} produtos diferentes · clique para ver o produto`);
     cp.append(tabela([['Produto', 'txt'], ['Pedidos'], ['Qtd.'], ['Total'], ['Última']], lp, [
       { cls: 'txt', fn: (r) => r.produto + (r.sku ? ' · ' + r.sku : '') }, { fn: (r) => F.int(r.pedidos.size) }, { fn: (r) => F.int(r.qtd) },
-      { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px'));
+      { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px', 'det-cli-prod'));
     g2.append(cp);
     box.append(g2);
     barrasMes(gm, porMes);
@@ -1718,7 +1765,7 @@ window.NK = (function () {
     cn.append(tabela([['Data', 'txt'], ['Nº'], ['Pedido Omie'], ['Etapa', 'txt'], ['Vendedor', 'txt esconde-estreito'], ['Itens'], ['Valor']],
       negs.map((r) => ({ ...r, cliente: undefined })), [
         { cls: 'txt', fn: (r) => F.data(r.data) }, { fn: (r) => r.negocio }, { fn: (r) => r.pedido || '—' }, { cls: 'txt', fn: etapa },
-        { cls: 'txt esconde-estreito', fn: (r) => r.vendedor }, { fn: (r) => F.int(r.itens) }, { cls: 'forte', fn: (r) => F.brl(r.valor) }], '420px'));
+        { cls: 'txt esconde-estreito', fn: (r) => r.vendedor }, { fn: (r) => F.int(r.itens) }, { cls: 'forte', fn: (r) => F.brl(r.valor) }], '420px', 'det-cli-neg'));
     box.append(cn);
   }
 
@@ -1755,7 +1802,7 @@ window.NK = (function () {
     g2.append(cm);
     const cc = card('Clientes que mais compram', 'Clique para ver o cliente');
     cc.append(tabela([['Cliente', 'txt'], ['Pedidos'], ['Qtd.'], ['Total'], ['Última']], clientes, [
-      { cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => F.int(r.pedidos.size) }, { fn: (r) => F.int(r.qtd) }, { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px'));
+      { cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => F.int(r.pedidos.size) }, { fn: (r) => F.int(r.qtd) }, { cls: 'verde', fn: (r) => F.brlK(r.total) }, { fn: (r) => F.data(r.ultima) }], '320px', 'det-prod-cli'));
     g2.append(cc);
     box.append(g2);
     const porMes = new Map();
@@ -1764,9 +1811,9 @@ window.NK = (function () {
     barrasMes(gm, porMes);
 
     const cv = card('Vendas do produto', 'Pedidos faturados com este produto, do mais recente para o mais antigo');
-    cv.append(tabela([['Data', 'txt'], ['Nº'], ['Cliente', 'txt'], ['Vendedor', 'txt esconde-estreito'], ['Qtd.'], ['Total']], linhas.slice(0, 300), [
+    cv.append(tabela([['Data', 'txt'], ['Nº'], ['Cliente', 'txt'], ['Vendedor', 'txt esconde-estreito'], ['Qtd.'], ['Total']], linhas, [
       { cls: 'txt', fn: (r) => F.data(r.data) }, { fn: (r) => r.negocio }, { cls: 'txt', fn: (r) => r.cliente }, { cls: 'txt esconde-estreito', fn: (r) => r.vendedor },
-      { fn: (r) => F.int(r.qtd) }, { cls: 'forte', fn: (r) => F.brl(r.total) }], '420px'));
+      { fn: (r) => F.int(r.qtd) }, { cls: 'forte', fn: (r) => F.brl(r.total) }], '420px', 'det-prod-vendas'));
     box.append(cv);
   }
 })();

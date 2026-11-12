@@ -22,6 +22,21 @@ const srv = http.createServer((req, res) => {
   console.log('voltar visível:', await p.isVisible('#det-voltar'));
   await p.click('#det-voltar'); await p.waitForTimeout(200); console.log('tipo após voltar:', await p.textContent('.nk-det-tipo'));
   await p.keyboard.press('Escape'); console.log('fechou:', await p.isHidden('#detalhe'));
+  // ordenação pelo cabeçalho
+  await p.click('#aba-produtos'); await p.waitForTimeout(300);
+  const col = async (sel, i) => p.$$eval(sel + ' tbody tr', (trs, i) => trs.slice(0, 5).map((t) => t.children[i].textContent), i);
+  await p.click('#t-produtos thead th:nth-child(6)'); console.log('qtd desc:', await col('#t-produtos', 5));
+  await p.click('#t-produtos thead th:nth-child(6)'); console.log('qtd asc:', await col('#t-produtos', 5), await p.getAttribute('#t-produtos thead th:nth-child(6)', 'aria-sort'));
+  await p.click('#t-produtos thead th:nth-child(2)'); console.log('nome asc:', await col('#t-produtos', 1));
+  await p.screenshot({ path: out + '/v_ord.png' });
+  await p.click('#aba-carteira'); await p.waitForTimeout(300);
+  await p.click('#t-carteira thead th:nth-child(8)'); console.log('dias desc:', await col('#t-carteira', 7));
+  await p.click('#aba-vendedores'); await p.waitForTimeout(300);
+  await p.click('#t-calor thead th:nth-child(3)'); console.log('calor:', await col('#t-calor', 2));
+  await p.click('#aba-abc'); await p.waitForTimeout(300);
+  await p.click('#t-abc tbody tr'); await p.waitForTimeout(300);
+  await p.click('#detalhe table[data-ord="det-cli-neg"] thead th:nth-child(7)'); console.log('det valor desc:', await col('#detalhe table[data-ord="det-cli-neg"]', 6));
+  await p.keyboard.press('Escape');
   console.log('erros:', JSON.stringify(errs));
   await b.close(); srv.close();
 });
