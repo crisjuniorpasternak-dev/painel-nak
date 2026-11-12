@@ -1,0 +1,1516 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Comercial NAK</title>
+<link rel="icon" href="/logo.png">
+<style>
+:root {
+  --font-anthropic-sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --cds-radius: 12px; --cds-dur-slow: 300ms; --cds-ease-out: cubic-bezier(.2,.7,.2,1); --color-bad: #dc2626;
+}
+html, body { margin: 0; background: #f4f4f5; }
+#dash-root { max-width: 1600px; margin: 0 auto; }
+.nk { border-radius: 0 !important; min-height: 100vh; }
+.dash-select { appearance: none; -webkit-appearance: none; padding: 7px 32px 7px 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235c5f66' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+.dash-skeleton { color: transparent !important; background: linear-gradient(90deg, #eee, #f6f6f6, #eee); border-radius: 6px; min-width: 6em; }
+</style>
+<script src="/d3.min.js"></script>
+<script>
+// Motor do painel: carrega /api/dados e oferece as funções que os gráficos usam (dash.data, dash.calc, dash.draw, filtros).
+(function () {
+  const DS = { negocios: { status: 'loading', data: [] }, itens: { status: 'loading', data: [] }, ciclo_crm: { status: 'loading', data: [] }, vendedores: { status: 'loading', data: [] } };
+  const calcs = {}, cache = {}, draws = {}, ouvintes = [];
+  const busca = new URLSearchParams(location.search);
+  let params = { periodo: busca.get('periodo') || 'tudo', vendedor: busca.get('vendedor') || 'Todos' };
+  let meta = {};
+
+  function data(id) {
+    if (DS[id]) return DS[id];
+    const c = calcs[id];
+    if (!c) return { status: 'missing', data: [] };
+    const ins = c.inputs.map(data);
+    const ruim = ins.find((i) => i.status !== 'ok');
+    if (ruim) return { status: ruim.status, data: null };
+    if (!(id in cache)) cache[id] = c.fn(...ins.map((i) => i.data));
+    return { status: 'ok', data: cache[id] };
+  }
+  function roda(nome) {
+    document.querySelectorAll('[data-draw="' + nome + '"]').forEach((el) => {
+      if (el.closest('[hidden]')) return;
+      try { draws[nome](el); } catch (e) { console.error('[painel]', nome, e); }
+    });
+  }
+  let pendente = false;
+  function tudo() {
+    if (pendente) return;
+    pendente = true;
+    requestAnimationFrame(() => {
+      pendente = false;
+      for (const fn of ouvintes) { try { fn(); } catch (e) { console.error('[painel]', e); } }
+      for (const n of Object.keys(draws)) roda(n);
+    });
+  }
+  function gravaUrl() {
+    const u = new URL(location.href);
+    for (const [k, v] of Object.entries(params)) { if (v == null || v === '' || (k === 'periodo' && v === 'tudo') || (k === 'vendedor' && v === 'Todos')) u.searchParams.delete(k); else u.searchParams.set(k, v); }
+    history.replaceState(null, '', u);
+  }
+  window.dash = {
+    data, colors: [],
+    calc: (id, o) => { calcs[id] = o; },
+    loader() {},
+    draw: (nome, fn) => { if (fn) draws[nome] = fn; else if (draws[nome]) roda(nome); },
+    onData: (fn) => { ouvintes.push(fn); },
+    params: () => ({ ...params }),
+    setParams: (p) => { params = { ...params, ...p }; gravaUrl(); tudo(); },
+    resetParams: () => { params = { periodo: 'tudo', vendedor: 'Todos' }; gravaUrl(); tudo(); },
+    setLink: (h) => { history.replaceState(null, '', '#' + h); tudo(); },
+    refresh: () => carrega(),
+    meta: () => meta,
+  };
+  addEventListener('resize', () => { clearTimeout(window.__rs); window.__rs = setTimeout(tudo, 150); });
+
+  async function carrega() {
+    try {
+      const r = await fetch('/api/dados', { credentials: 'same-origin' });
+      if (r.status === 401) { location.href = '/login.html'; return; }
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.erro || r.status);
+      for (const k of Object.keys(DS)) DS[k] = { status: 'ok', data: j[k] || [] };
+      meta = { atualizado_em: j.atualizado_em };
+    } catch (e) {
+      console.error('[painel] falha ao carregar', e);
+      for (const k of Object.keys(DS)) DS[k] = { status: 'error', data: [], message: String(e) };
+    }
+    for (const k of Object.keys(cache)) delete cache[k];
+    tudo();
+  }
+  addEventListener('DOMContentLoaded', () => { tudo(); carrega(); });
+})();
+</script>
+<style>
+#dash-root { --dash-gutter: 0; }
+.nk {
+  --nk-laranja: #f26b1d;
+  --nk-laranja-esc: #c9540f;
+  --nk-laranja-claro: #fff1e8;
+  --nk-preto: #141414;
+  --nk-grafite: #2e2e2e;
+  --nk-texto: #1d1d1f;
+  --nk-texto-2: #5c5f66;
+  --nk-texto-3: #8b8f97;
+  --nk-linha: #e7e7ea;
+  --nk-fundo: #f4f4f5;
+  --nk-card: #ffffff;
+  --nk-ok: #16a34a; --nk-atencao: #d99a06; --nk-risco: #f26b1d; --nk-critico: #dc2626; --nk-inativo: #7f1d1d; --nk-sem: #a1a1aa;
+  --nk-a: #f26b1d; --nk-b: #2e2e2e; --nk-c: #b8b8be;
+  background: var(--nk-fundo); color: var(--nk-texto);
+  font-family: var(--font-anthropic-sans); font-size: 13px; line-height: 1.4;
+  color-scheme: light; border-radius: var(--cds-radius); overflow: hidden;
+}
+.nk * { box-sizing: border-box; }
+.nk-barra-preta { height: 6px; background: var(--nk-preto); }
+.nk-topo { background: #fff; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; padding: 14px clamp(14px, 2.4vw, 28px); border-bottom: 3px solid var(--nk-laranja); }
+.nk-logo { height: 46px; width: auto; display: block; }
+.nk-tit { flex: 1 1 14rem; min-width: 0; }
+.nk h1 { margin: 0; font-size: clamp(18px, 2vw, 22px); font-weight: 700; color: var(--nk-preto); letter-spacing: -.01em; }
+.nk-sub { margin: 2px 0 0; color: var(--nk-texto-2); font-size: 12.5px; }
+.nk-atual { font-size: 12px; color: var(--nk-texto-2); background: var(--nk-fundo); border: 1px solid var(--nk-linha); border-radius: 999px; padding: 6px 12px; display: inline-flex; gap: 6px; align-items: center; }
+.nk-atual::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--nk-ok); }
+.nk-atual b { color: var(--nk-texto); }
+.nk-sair { font-size: 12.5px; color: var(--nk-texto-2); text-decoration: none; border: 1px solid var(--nk-linha); border-radius: 8px; padding: 6px 12px; }
+.nk-sair:hover { color: var(--nk-laranja-esc); border-color: var(--nk-laranja); }
+
+.nk-abas { background: var(--nk-preto); display: flex; gap: 2px; padding: 0 clamp(8px, 2vw, 22px); overflow-x: auto; }
+.nk-abas button { font: inherit; font-size: 13px; font-weight: 600; color: #c9c9cf; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 14px 9px; cursor: pointer; white-space: nowrap; }
+.nk-abas button:hover { color: #fff; }
+.nk-abas button[aria-selected="true"] { color: #fff; border-bottom-color: var(--nk-laranja); }
+.nk-abas button:focus-visible { outline: 2px solid var(--nk-laranja); outline-offset: -2px; }
+
+.nk-filtros { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 14px clamp(14px, 2.4vw, 28px) 0; }
+.nk-filtro { display: grid; gap: 4px; min-width: 0; }
+.nk-filtro label { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--nk-texto-3); font-weight: 700; }
+.nk select.dash-select { font: inherit; font-size: 13px; border: 1px solid var(--nk-linha); border-radius: 8px; background-color: #fff; color: var(--nk-texto); min-width: 13rem; max-width: 100%; }
+.nk select:focus-visible, .nk input:focus-visible, .nk button:focus-visible { outline: 2px solid var(--nk-laranja); outline-offset: 1px; }
+.nk-limpar { font: inherit; font-size: 12.5px; border: 1px solid var(--nk-linha); background: #fff; color: var(--nk-texto); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.nk-limpar:hover { border-color: var(--nk-laranja); color: var(--nk-laranja-esc); }
+.nk-intervalo { font-size: 12px; color: var(--nk-texto-2); margin-left: auto; padding-bottom: 8px; }
+.nk-intervalo b { color: var(--nk-texto); font-weight: 600; }
+
+.nk [hidden] { display: none !important; }
+.nk-pagina { padding: 14px clamp(14px, 2.4vw, 28px) 24px; display: grid; gap: 14px; }
+.nk-g { display: grid; gap: 14px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.nk-s12 { grid-column: span 12; } .nk-s8 { grid-column: span 8; } .nk-s7 { grid-column: span 7; } .nk-s6 { grid-column: span 6; } .nk-s5 { grid-column: span 5; } .nk-s4 { grid-column: span 4; }
+@media (max-width: 1050px) { .nk-s8, .nk-s7, .nk-s6, .nk-s5, .nk-s4 { grid-column: span 12; } }
+
+.nk-card { background: var(--nk-card); border: 1px solid var(--nk-linha); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.nk-card-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.nk h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nk-preto); }
+.nk-card-sub { margin: 2px 0 0; font-size: 12px; color: var(--nk-texto-3); }
+
+.nk-kpis { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); }
+.nk-kpi { background: #fff; border: 1px solid var(--nk-linha); border-radius: 12px; padding: 14px 16px; position: relative; min-width: 0; }
+.nk-kpi.destaque { border-color: var(--nk-laranja); box-shadow: inset 0 0 0 1px var(--nk-laranja); }
+.nk-kpi-rot { font-size: 13px; font-weight: 600; color: var(--nk-texto); padding-right: 28px; }
+.nk-kpi-val { font-size: clamp(20px, 2vw, 25px); font-weight: 700; color: var(--nk-preto); margin-top: 8px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.nk-kpi-det { font-size: 12px; color: var(--nk-texto-2); margin-top: 2px; font-variant-numeric: tabular-nums; min-height: 1.3em; }
+.nk-kpi-var { font-size: 11.5px; margin-top: 6px; font-weight: 600; min-height: 1.3em; font-variant-numeric: tabular-nums; }
+.nk-kpi-var.bom { color: var(--nk-ok); } .nk-kpi-var.ruim { color: var(--nk-critico); } .nk-kpi-var.neutro { color: var(--nk-texto-3); font-weight: 500; }
+.nk-kpi-ic { position: absolute; top: 14px; right: 14px; width: 22px; height: 22px; color: var(--nk-laranja); }
+.nk-kpi-ic.esc { color: var(--nk-grafite); }
+
+.nk-seg { display: inline-flex; border: 1px solid var(--nk-linha); border-radius: 8px; overflow: hidden; background: #fff; }
+.nk-seg button { font: inherit; font-size: 12.5px; border: 0; background: #fff; color: var(--nk-texto-2); padding: 6px 12px; cursor: pointer; }
+.nk-seg button + button { border-left: 1px solid var(--nk-linha); }
+.nk-seg button[aria-pressed="true"] { background: var(--nk-preto); color: #fff; }
+
+.nk-graf { position: relative; min-height: 260px; }
+.nk-graf svg { display: block; overflow: visible; }
+.nk-graf text { fill: var(--nk-texto-2); font-size: 11.5px; font-family: var(--font-anthropic-sans); }
+.nk-graf .eixo text { fill: var(--nk-texto-3); }
+.nk-graf .eixo path { display: none; }
+.nk-graf .eixo line { stroke: var(--nk-linha); }
+.nk-graf .rot { fill: var(--nk-texto); font-weight: 600; }
+.nk-leg { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--nk-texto-2); margin-top: 8px; }
+.nk-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.nk-leg i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.nk-dica { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--nk-linha); border-radius: 8px; box-shadow: 0 8px 22px rgba(0,0,0,.12); padding: 7px 10px; font-size: 12px; color: var(--nk-texto); white-space: nowrap; z-index: 5; font-variant-numeric: tabular-nums; }
+.nk-dica .t { font-weight: 700; margin-bottom: 3px; }
+.nk-dica .l { display: flex; align-items: center; gap: 6px; color: var(--nk-texto-2); }
+.nk-dica .l i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.nk-donut-wrap { display: grid; gap: 10px; }
+.nk-donut-leg { display: grid; gap: 6px; font-size: 12.5px; max-height: 210px; overflow: auto; }
+.nk-donut-leg div { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; }
+.nk-donut-leg i { width: 10px; height: 10px; border-radius: 50%; }
+.nk-donut-leg .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nk-donut-leg .p { font-weight: 700; font-variant-numeric: tabular-nums; }
+.nk-donut-leg .v { color: var(--nk-texto-3); font-variant-numeric: tabular-nums; min-width: 5.5em; text-align: right; }
+
+.nk-tab-wrap { overflow: auto; max-height: 520px; }
+.nk table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.nk th { position: sticky; top: 0; background: #fff; color: var(--nk-texto-3); font-weight: 600; font-size: 11.5px; text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--nk-linha); white-space: nowrap; z-index: 1; }
+.nk th.txt, .nk td.txt { text-align: left; }
+.nk th button { all: unset; cursor: pointer; }
+.nk th[aria-sort="descending"] button::after { content: " ↓"; color: var(--nk-laranja); }
+.nk th[aria-sort="ascending"] button::after { content: " ↑"; color: var(--nk-laranja); }
+.nk td { padding: 9px 10px; border-bottom: 1px solid var(--nk-linha); text-align: right; white-space: nowrap; color: var(--nk-texto); }
+.nk td.txt { white-space: normal; min-width: 12rem; }
+.nk tbody tr:hover td { background: #fafafa; }
+.nk td.verde { color: var(--nk-ok); font-weight: 700; }
+.nk td.forte { font-weight: 700; }
+.nk-pessoa { display: flex; align-items: center; gap: 10px; min-width: 12rem; }
+.nk-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--nk-laranja-claro); color: var(--nk-laranja-esc); flex: 0 0 auto; }
+.nk-pessoa .nm { font-weight: 600; color: var(--nk-texto); }
+.nk-pessoa .em { font-size: 12px; color: var(--nk-texto-3); }
+.nk-pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.nk-pill.A { background: var(--nk-a); color: #fff; }
+.nk-pill.B { background: var(--nk-b); color: #fff; }
+.nk-pill.C { background: #ececef; color: var(--nk-texto-2); }
+.nk-pill.X { background: #fff; color: var(--nk-texto-3); border: 1px dashed var(--nk-c); }
+.nk-sit { display: inline-flex; align-items: center; gap: 6px; }
+.nk-sit::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cor, var(--nk-sem)); }
+.nk-barra-cel { display: inline-block; height: 6px; border-radius: 3px; background: var(--nk-laranja); vertical-align: middle; margin-left: 8px; }
+
+.nk-ferr { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-bottom: 10px; }
+.nk input[type=search] { font: inherit; font-size: 13px; padding: 7px 11px; border: 1px solid var(--nk-linha); border-radius: 8px; min-width: 0; flex: 1 1 15rem; color: var(--nk-texto); background: #fff; }
+.nk-mais { font: inherit; font-size: 12.5px; border: 1px solid var(--nk-linha); background: #fff; border-radius: 8px; padding: 8px 14px; cursor: pointer; margin-top: 10px; }
+.nk-mais:hover { border-color: var(--nk-laranja); }
+.nk-cont { font-size: 12px; color: var(--nk-texto-3); }
+
+.nk-abc { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.nk-abc-t { background: #fff; border: 1px solid var(--nk-linha); border-radius: 12px; padding: 14px 16px; border-top: 4px solid var(--cor); }
+.nk-abc-t .topo { display: flex; justify-content: space-between; align-items: baseline; }
+.nk-abc-t .nome { font-weight: 700; font-size: 14px; }
+.nk-abc-t .regra { font-size: 11.5px; color: var(--nk-texto-3); }
+.nk-abc-t .grande { font-size: 24px; font-weight: 700; margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
+.nk-abc-t dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 12.5px; }
+.nk-abc-t dt { color: var(--nk-texto-2); }
+.nk-abc-t dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.nk-sits { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); }
+.nk-sit-c { font: inherit; text-align: left; background: #fff; border: 1px solid var(--nk-linha); border-left: 4px solid var(--cor); border-radius: 10px; padding: 10px 12px; cursor: pointer; color: var(--nk-texto); }
+.nk-sit-c[aria-pressed="true"] { background: var(--nk-laranja-claro); border-color: var(--nk-laranja); border-left-color: var(--cor); }
+.nk-sit-c .r { font-size: 12px; font-weight: 600; display: block; }
+.nk-sit-c .f { font-size: 11px; color: var(--nk-texto-3); display: block; }
+.nk-sit-c .n { font-size: 21px; font-weight: 700; display: block; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.nk-sit-c .v { font-size: 11.5px; color: var(--nk-texto-2); display: block; font-variant-numeric: tabular-nums; }
+
+.nk-calor td.c { text-align: right; }
+.nk-aviso { display: grid; gap: 8px; place-content: center; text-align: center; min-height: 200px; color: var(--nk-texto-2); font-size: 13px; padding: 10px; }
+.nk-aviso strong { color: var(--nk-texto); font-size: 14px; }
+.nk-rodape { font-size: 11.5px; color: var(--nk-texto-3); padding: 0 clamp(14px, 2.4vw, 28px) 18px; }
+.nk-rodape summary { cursor: pointer; color: var(--nk-texto-2); }
+.nk-rodape ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+
+.nk [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.nk-erro { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: inherit; color: var(--nk-texto-3); font-size: 12px; }
+.nk-erro::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-bad); }
+@media (max-width: 600px) { .nk .esconde-estreito { display: none; } .nk select.dash-select { min-width: 0; width: 100%; } .nk-filtro { flex: 1 1 100%; } .nk-intervalo { margin-left: 0; } .nk-logo { height: 36px; } }
+</style>
+</head>
+<body>
+<div id="dash-root">
+
+
+<div class="nk" id="painel">
+  <div class="nk-barra-preta"></div>
+  <header class="nk-topo">
+    <img class="nk-logo" alt="NAK" src="data:image/png;base64,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">
+    <div class="nk-tit">
+      <h1>Painel Comercial</h1>
+      <p class="nk-sub">Desempenho de vendas da NAK a partir do CRM DataCrazy</p>
+    </div>
+    <div class="nk-atual">Dados até <b data-draw="ref" data-source="c_periodos" data-field="fim" data-where="id=tudo">—</b> · sincroniza com o CRM</div>
+    <a class="nk-sair" href="/api/login">Sair</a>
+  </header>
+
+  <nav class="nk-abas" role="tablist" aria-label="Páginas do painel">
+    <button type="button" role="tab" id="aba-geral" data-pag="geral" aria-selected="true">Visão geral</button>
+    <button type="button" role="tab" id="aba-vendedores" data-pag="vendedores" aria-selected="false">Vendedores</button>
+    <button type="button" role="tab" id="aba-abc" data-pag="abc" aria-selected="false">Curva ABC</button>
+    <button type="button" role="tab" id="aba-produtos" data-pag="produtos" aria-selected="false">Produtos</button>
+    <button type="button" role="tab" id="aba-carteira" data-pag="carteira" aria-selected="false">Carteira de clientes</button>
+    <button type="button" role="tab" id="aba-funil" data-pag="funil" aria-selected="false">Funil e orçamentos</button>
+  </nav>
+
+  <div class="nk-filtros" id="filtros">
+    <div class="nk-filtro"><label for="f-periodo">Período</label><select class="dash-select" id="f-periodo" data-draw="f-periodo" data-source="c_periodos"></select></div>
+    <div class="nk-filtro"><label for="f-vendedor">Vendedor</label><select class="dash-select" id="f-vendedor" data-draw="f-vendedor" data-source="c_vend"></select></div>
+    <button type="button" class="nk-limpar" id="f-limpar">Limpar filtros</button>
+    <div class="nk-intervalo" id="f-intervalo">De <b data-draw="intervalo-ini">—</b> a <b data-draw="intervalo-fim">—</b></div>
+  </div>
+
+  <!-- ===================== VISÃO GERAL ===================== -->
+  <section class="nk-pagina" id="geral" role="tabpanel" aria-labelledby="aba-geral">
+    <div class="nk-kpis" id="kpis">
+      <div class="nk-kpi destaque" id="kpi-faturado">
+        <svg class="nk-kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+        <div class="nk-kpi-rot">Total faturado</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="fat_valor" data-fmt="brlK">—</div>
+        <div class="nk-kpi-det"><span data-draw="kpi" data-source="c_kpi" data-field="fat_n" data-fmt="int">—</span> negócios ganhos</div>
+        <div class="nk-kpi-var" data-draw="var" data-source="c_kpi" data-field="var_fat" data-bom="sobe">—</div>
+      </div>
+      <div class="nk-kpi" id="kpi-aberto">
+        <svg class="nk-kpi-ic esc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        <div class="nk-kpi-rot">Total em aberto</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="aberto_valor" data-fmt="brlK">—</div>
+        <div class="nk-kpi-det"><span data-draw="kpi" data-source="c_kpi" data-field="aberto_n" data-fmt="int">—</span> negócios</div>
+        <div class="nk-kpi-var neutro">orçamento, separação e aguardando faturamento</div>
+      </div>
+      <div class="nk-kpi" id="kpi-perdido">
+        <svg class="nk-kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color:var(--nk-critico)"><path d="M3 7l6 6 4-4 8 8"/><path d="M14 17h7v-7"/></svg>
+        <div class="nk-kpi-rot">Total perdido</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="perd_valor" data-fmt="brlK">—</div>
+        <div class="nk-kpi-det"><span data-draw="kpi" data-source="c_kpi" data-field="perd_n" data-fmt="int">—</span> negócios</div>
+        <div class="nk-kpi-var neutro">marcados como perdidos no CRM</div>
+      </div>
+      <div class="nk-kpi" id="kpi-ticket">
+        <svg class="nk-kpi-ic esc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>
+        <div class="nk-kpi-rot">Ticket médio</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="ticket" data-fmt="brl">—</div>
+        <div class="nk-kpi-det">por pedido faturado</div>
+        <div class="nk-kpi-var" data-draw="var" data-source="c_kpi" data-field="var_ticket" data-bom="sobe">—</div>
+      </div>
+      <div class="nk-kpi" id="kpi-clientes">
+        <svg class="nk-kpi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.8c1.8.8 3 2.5 3.5 5.2"/></svg>
+        <div class="nk-kpi-rot">Clientes que compraram</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="clientes" data-fmt="int">—</div>
+        <div class="nk-kpi-det">clientes diferentes</div>
+        <div class="nk-kpi-var" data-draw="var" data-source="c_kpi" data-field="var_clientes" data-bom="sobe">—</div>
+      </div>
+      <div class="nk-kpi" id="kpi-total">
+        <svg class="nk-kpi-ic esc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 20V10M10 20V4M15 20v-7M20 20V8"/></svg>
+        <div class="nk-kpi-rot">Total de negócios</div>
+        <div class="nk-kpi-val dash-skeleton" data-draw="kpi" data-source="c_kpi" data-field="total_valor" data-fmt="brlK">—</div>
+        <div class="nk-kpi-det"><span data-draw="kpi" data-source="c_kpi" data-field="total_n" data-fmt="int">—</span> negócios</div>
+        <div class="nk-kpi-var neutro">taxa de fechamento <span data-draw="kpi" data-source="c_kpi" data-field="conv" data-fmt="pct">—</span></div>
+      </div>
+    </div>
+
+    <div class="nk-g">
+      <div class="nk-card nk-s8" id="card-diario">
+        <div class="nk-card-cab">
+          <div><h3>Dados diários</h3><p class="nk-card-sub">Faturado e em aberto por dia da última movimentação (semana ou mês em períodos longos)</p></div>
+          <div class="nk-seg" role="group" aria-label="Medida do gráfico diário"><button type="button" data-med="valor" data-alvo="g-diario" aria-pressed="true">Valor</button><button type="button" data-med="qtd" data-alvo="g-diario" aria-pressed="false">Quantidade</button></div>
+        </div>
+        <div class="nk-graf" data-draw="g-diario" data-source="negocios c_periodos" style="min-height:280px"></div>
+        <div class="nk-leg"><span><i style="background:var(--nk-laranja)"></i>Faturado</span><span><i style="background:var(--nk-grafite)"></i>Em aberto</span></div>
+      </div>
+      <div class="nk-card nk-s4" id="card-donut">
+        <div class="nk-card-cab">
+          <div><h3>Percentual por vendedor</h3><p class="nk-card-sub">Participação no faturado do período</p></div>
+          <div class="nk-seg" role="group" aria-label="Medida da participação"><button type="button" data-med="valor" data-alvo="g-donut" aria-pressed="true">Valor</button><button type="button" data-med="qtd" data-alvo="g-donut" aria-pressed="false">Qtd.</button></div>
+        </div>
+        <div class="nk-donut-wrap" data-draw="g-donut" data-source="c_vend" style="min-height:330px"></div>
+      </div>
+      <div class="nk-card nk-s6" id="card-atendentes">
+        <div class="nk-card-cab"><div><h3>Vendedores com mais vendas</h3><p class="nk-card-sub">Pedidos faturados no período</p></div></div>
+        <div class="nk-tab-wrap" style="max-height:420px">
+          <table id="t-atendentes" data-source="c_vend" data-row-key="periodo,vendedor">
+            <thead><tr><th class="txt" data-field="vendedor">Vendedor</th><th data-field="fat_n">Negócios</th><th data-field="ticket">Ticket médio</th><th data-field="fat_valor">Total</th></tr></thead>
+            <tbody data-draw="t-atendentes"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="nk-card nk-s6" id="card-top-clientes">
+        <div class="nk-card-cab"><div><h3>Clientes que mais compraram</h3><p class="nk-card-sub">Os 10 maiores no período e vendedor escolhidos</p></div></div>
+        <div class="nk-tab-wrap" style="max-height:420px">
+          <table id="t-top">
+            <thead><tr><th class="txt">Cliente</th><th>Pedidos</th><th>Ticket médio</th><th>Total</th></tr></thead>
+            <tbody data-draw="t-top" data-source="negocios"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="nk-card nk-s12" id="card-produtos">
+        <div class="nk-card-cab"><div><h3>Produtos mais vendidos</h3><p class="nk-card-sub">Os 10 de maior valor faturado no período e vendedor escolhidos</p></div></div>
+        <div class="nk-tab-wrap" style="max-height:460px">
+          <table id="t-prod-top">
+            <thead><tr><th class="txt">Produto</th><th>Negócios</th><th>Quantidade</th><th>Ticket médio</th><th>Total</th></tr></thead>
+            <tbody data-draw="t-prod-top"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VENDEDORES ===================== -->
+  <section class="nk-pagina" id="vendedores" role="tabpanel" aria-labelledby="aba-vendedores" hidden>
+    <div class="nk-card" id="card-vend">
+      <div class="nk-card-cab"><div><h3>Resultado por vendedor</h3><p class="nk-card-sub">No período escolhido · clique no título de uma coluna para ordenar</p></div></div>
+      <div class="nk-tab-wrap">
+        <table id="t-vend" data-source="c_vend" data-row-key="periodo,vendedor">
+          <thead><tr>
+            <th class="txt" data-field="vendedor"><button type="button">Vendedor</button></th>
+            <th data-field="fat_valor" aria-sort="descending"><button type="button">Faturado</button></th>
+            <th data-field="pct"><button type="button">Participação</button></th>
+            <th data-field="fat_n"><button type="button">Pedidos</button></th>
+            <th data-field="ticket"><button type="button">Ticket médio</button></th>
+            <th data-field="clientes"><button type="button">Clientes</button></th>
+            <th data-field="aberto_n" class="esconde-estreito"><button type="button">Em aberto</button></th>
+            <th data-field="aberto_valor" class="esconde-estreito"><button type="button">Valor em aberto</button></th>
+            <th data-field="conv"><button type="button">Fechamento</button></th>
+          </tr></thead>
+          <tbody data-draw="t-vend"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="nk-card" id="card-vend-mes">
+      <div class="nk-card-cab"><div><h3>Faturado por vendedor e mês</h3><p class="nk-card-sub">Todos os meses com dados · quanto mais forte o laranja, maior o valor</p></div></div>
+      <div class="nk-tab-wrap">
+        <table class="nk-calor" id="t-calor" data-draw="t-calor" data-source="negocios"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CURVA ABC ===================== -->
+  <section class="nk-pagina" id="abc" role="tabpanel" aria-labelledby="aba-abc" hidden>
+    <div class="nk-abc" id="abc-resumo">
+      <div class="nk-abc-t" style="--cor:var(--nk-a)" id="abc-A">
+        <div class="topo"><span class="nome">Curva A</span><span class="regra">primeiros 80% do faturado</span></div>
+        <div class="grande" data-draw="abc-card" data-classe="A" data-campo="receita">—</div>
+        <dl><dt>Clientes</dt><dd data-draw="abc-card" data-classe="A" data-campo="clientes">—</dd><dt>% dos clientes</dt><dd data-draw="abc-card" data-classe="A" data-campo="pct_cli">—</dd><dt>% do faturado</dt><dd data-draw="abc-card" data-classe="A" data-campo="pct_rec">—</dd><dt>Ticket médio</dt><dd data-draw="abc-card" data-classe="A" data-campo="ticket">—</dd></dl>
+      </div>
+      <div class="nk-abc-t" style="--cor:var(--nk-b)" id="abc-B">
+        <div class="topo"><span class="nome">Curva B</span><span class="regra">próximos 15%</span></div>
+        <div class="grande" data-draw="abc-card" data-classe="B" data-campo="receita">—</div>
+        <dl><dt>Clientes</dt><dd data-draw="abc-card" data-classe="B" data-campo="clientes">—</dd><dt>% dos clientes</dt><dd data-draw="abc-card" data-classe="B" data-campo="pct_cli">—</dd><dt>% do faturado</dt><dd data-draw="abc-card" data-classe="B" data-campo="pct_rec">—</dd><dt>Ticket médio</dt><dd data-draw="abc-card" data-classe="B" data-campo="ticket">—</dd></dl>
+      </div>
+      <div class="nk-abc-t" style="--cor:var(--nk-c)" id="abc-C">
+        <div class="topo"><span class="nome">Curva C</span><span class="regra">últimos 5%</span></div>
+        <div class="grande" data-draw="abc-card" data-classe="C" data-campo="receita">—</div>
+        <dl><dt>Clientes</dt><dd data-draw="abc-card" data-classe="C" data-campo="clientes">—</dd><dt>% dos clientes</dt><dd data-draw="abc-card" data-classe="C" data-campo="pct_cli">—</dd><dt>% do faturado</dt><dd data-draw="abc-card" data-classe="C" data-campo="pct_rec">—</dd><dt>Ticket médio</dt><dd data-draw="abc-card" data-classe="C" data-campo="ticket">—</dd></dl>
+      </div>
+    </div>
+    <div class="nk-card" id="card-pareto">
+      <div class="nk-card-cab"><div><h3>Curva ABC de clientes</h3><p class="nk-card-sub">Faturado acumulado conforme se somam os clientes, do maior para o menor, no período e vendedor escolhidos</p></div></div>
+      <div class="nk-graf" data-draw="g-pareto" data-source="negocios" style="min-height:280px"></div>
+    </div>
+    <div class="nk-card" id="card-abc-tab">
+      <div class="nk-card-cab"><div><h3>Clientes por curva</h3><p class="nk-card-sub">Ordenados pelo faturado no período</p></div><span class="nk-cont" data-draw="abc-cont">—</span></div>
+      <div class="nk-ferr">
+        <input type="search" id="abc-busca" placeholder="Buscar cliente…" aria-label="Buscar cliente na curva ABC">
+        <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-abc="" aria-pressed="true">Todas</button><button type="button" data-abc="A" aria-pressed="false">A</button><button type="button" data-abc="B" aria-pressed="false">B</button><button type="button" data-abc="C" aria-pressed="false">C</button></div>
+      </div>
+      <div class="nk-tab-wrap">
+        <table id="t-abc">
+          <thead><tr><th>#</th><th class="txt">Cliente</th><th>Curva</th><th>Faturado</th><th>% do total</th><th>% acumulado</th><th>Pedidos</th><th class="esconde-estreito">Ticket médio</th><th class="txt esconde-estreito">Vendedor</th></tr></thead>
+          <tbody data-draw="t-abc" data-source="negocios"></tbody>
+        </table>
+      </div>
+      <button type="button" class="nk-mais" id="abc-mais" data-alvo="t-abc">Mostrar mais</button>
+    </div>
+  </section>
+
+  <section class="nk-pagina" id="produtos" role="tabpanel" aria-labelledby="aba-produtos" hidden>
+    <div class="nk-abc" id="prod-resumo">
+      <div class="nk-abc-t" style="--cor:var(--nk-a)"><div class="topo"><span class="nome">Curva A</span><span class="regra">primeiros 80% do faturado</span></div><div class="grande" data-draw="prod-card" data-classe="A" data-campo="total">—</div><dl><dt>Produtos</dt><dd data-draw="prod-card" data-classe="A" data-campo="n">—</dd><dt>% dos produtos</dt><dd data-draw="prod-card" data-classe="A" data-campo="pct_n">—</dd><dt>% do faturado</dt><dd data-draw="prod-card" data-classe="A" data-campo="pct_total">—</dd></dl></div>
+      <div class="nk-abc-t" style="--cor:var(--nk-b)"><div class="topo"><span class="nome">Curva B</span><span class="regra">próximos 15%</span></div><div class="grande" data-draw="prod-card" data-classe="B" data-campo="total">—</div><dl><dt>Produtos</dt><dd data-draw="prod-card" data-classe="B" data-campo="n">—</dd><dt>% dos produtos</dt><dd data-draw="prod-card" data-classe="B" data-campo="pct_n">—</dd><dt>% do faturado</dt><dd data-draw="prod-card" data-classe="B" data-campo="pct_total">—</dd></dl></div>
+      <div class="nk-abc-t" style="--cor:var(--nk-c)"><div class="topo"><span class="nome">Curva C</span><span class="regra">últimos 5%</span></div><div class="grande" data-draw="prod-card" data-classe="C" data-campo="total">—</div><dl><dt>Produtos</dt><dd data-draw="prod-card" data-classe="C" data-campo="n">—</dd><dt>% dos produtos</dt><dd data-draw="prod-card" data-classe="C" data-campo="pct_n">—</dd><dt>% do faturado</dt><dd data-draw="prod-card" data-classe="C" data-campo="pct_total">—</dd></dl></div>
+    </div>
+    <div class="nk-card" id="card-produtos-tab">
+      <div class="nk-card-cab"><div><h3>Produtos vendidos</h3><p class="nk-card-sub">Itens dos pedidos faturados no período e vendedor escolhidos</p></div><span class="nk-cont" data-draw="prod-cont">—</span></div>
+      <div class="nk-ferr">
+        <input type="search" id="prod-busca" placeholder="Buscar produto ou SKU…" aria-label="Buscar produto">
+        <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-pabc="" aria-pressed="true">Todas</button><button type="button" data-pabc="A" aria-pressed="false">A</button><button type="button" data-pabc="B" aria-pressed="false">B</button><button type="button" data-pabc="C" aria-pressed="false">C</button></div>
+      </div>
+      <div class="nk-tab-wrap">
+        <table id="t-produtos">
+          <thead><tr><th>#</th><th class="txt">Produto</th><th>Curva</th><th>Negócios</th><th>Clientes</th><th>Quantidade</th><th class="esconde-estreito">Preço médio</th><th>Total</th><th>% acumulado</th></tr></thead>
+          <tbody data-draw="t-produtos"></tbody>
+        </table>
+      </div>
+      <button type="button" class="nk-mais" id="prod-mais" data-alvo="t-produtos">Mostrar mais</button>
+    </div>
+  </section>
+
+  <!-- ===================== CARTEIRA ===================== -->
+  <section class="nk-pagina" id="carteira" role="tabpanel" aria-labelledby="aba-carteira" hidden>
+    <div class="nk-card" id="card-sit">
+      <div class="nk-card-cab"><div><h3>Carteira por dias sem comprar</h3><p class="nk-card-sub">Clientes do vendedor escolhido, contando da última compra faturada · clique para filtrar a lista</p></div></div>
+      <div class="nk-sits" id="sits">
+        <button type="button" class="nk-sit-c" data-sit="Saudável" aria-pressed="false" style="--cor:var(--nk-ok)"><span class="r">Saudável</span><span class="f">até 29 dias</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Saudável">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="receita" data-sit="Saudável">—</span> faturado</span></button>
+        <button type="button" class="nk-sit-c" data-sit="Atenção" aria-pressed="false" style="--cor:var(--nk-atencao)"><span class="r">Atenção</span><span class="f">30 a 44 dias</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Atenção">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="receita" data-sit="Atenção">—</span> faturado</span></button>
+        <button type="button" class="nk-sit-c" data-sit="Risco" aria-pressed="false" style="--cor:var(--nk-risco)"><span class="r">Risco</span><span class="f">45 a 59 dias</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Risco">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="receita" data-sit="Risco">—</span> faturado</span></button>
+        <button type="button" class="nk-sit-c" data-sit="Crítico" aria-pressed="false" style="--cor:var(--nk-critico)"><span class="r">Crítico</span><span class="f">60 a 89 dias</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Crítico">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="receita" data-sit="Crítico">—</span> faturado</span></button>
+        <button type="button" class="nk-sit-c" data-sit="Inativo" aria-pressed="false" style="--cor:var(--nk-inativo)"><span class="r">Inativo</span><span class="f">90 dias ou mais</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Inativo">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="receita" data-sit="Inativo">—</span> faturado</span></button>
+        <button type="button" class="nk-sit-c" data-sit="Sem compra" aria-pressed="false" style="--cor:var(--nk-sem)"><span class="r">Sem compra</span><span class="f">só orçamentos</span><span class="n" data-draw="sit" data-source="c_situacao" data-field="clientes" data-sit="Sem compra">—</span><span class="v"><span data-draw="sit" data-source="c_situacao" data-field="aberto_valor" data-sit="Sem compra">—</span> em aberto</span></button>
+      </div>
+    </div>
+    <div class="nk-card" id="card-carteira">
+      <div class="nk-card-cab"><div><h3>Carteira de clientes</h3><p class="nk-card-sub">Histórico completo de cada cliente no CRM · curva ABC sobre todo o período</p></div><span class="nk-cont" data-draw="cart-cont">—</span></div>
+      <div class="nk-ferr">
+        <input type="search" id="cart-busca" placeholder="Buscar cliente…" aria-label="Buscar cliente na carteira">
+        <div class="nk-seg" role="group" aria-label="Filtrar curva"><button type="button" data-cabc="" aria-pressed="true">Todas</button><button type="button" data-cabc="A" aria-pressed="false">A</button><button type="button" data-cabc="B" aria-pressed="false">B</button><button type="button" data-cabc="C" aria-pressed="false">C</button></div>
+      </div>
+      <div class="nk-tab-wrap">
+        <table id="t-carteira" data-source="c_clientes" data-row-key="cliente">
+          <thead><tr>
+            <th class="txt" data-field="cliente"><button type="button">Cliente</button></th>
+            <th class="txt esconde-estreito" data-field="vendedor"><button type="button">Vendedor</button></th>
+            <th data-field="abc"><button type="button">Curva</button></th>
+            <th data-field="receita" aria-sort="descending"><button type="button">Faturado</button></th>
+            <th data-field="pedidos"><button type="button">Pedidos</button></th>
+            <th data-field="ticket" class="esconde-estreito"><button type="button">Ticket médio</button></th>
+            <th data-field="ultima"><button type="button">Última compra</button></th>
+            <th data-field="dias"><button type="button">Dias sem comprar</button></th>
+            <th data-field="ciclo_medio" class="esconde-estreito"><button type="button">Recompra a cada</button></th>
+            <th class="txt" data-field="situacao"><button type="button">Situação</button></th>
+            <th data-field="aberto_valor" class="esconde-estreito"><button type="button">Em aberto</button></th>
+          </tr></thead>
+          <tbody data-draw="t-carteira"></tbody>
+        </table>
+      </div>
+      <button type="button" class="nk-mais" id="cart-mais" data-alvo="t-carteira">Mostrar mais</button>
+    </div>
+    <div class="nk-card" id="card-ciclo-crm">
+      <div class="nk-card-cab"><div><h3>Funil Ciclo de Compra no CRM</h3><p class="nk-card-sub">Negócios em cada etapa do funil de recompra do DataCrazy, todos os vendedores</p></div></div>
+      <div class="nk-graf" data-draw="g-ciclo" data-source="ciclo_crm" style="min-height:200px"></div>
+    </div>
+  </section>
+
+  <!-- ===================== FUNIL ===================== -->
+  <section class="nk-pagina" id="funil" role="tabpanel" aria-labelledby="aba-funil" hidden>
+    <div class="nk-g">
+      <div class="nk-card nk-s6" id="card-etapas">
+        <div class="nk-card-cab"><div><h3>Funil de vendas hoje</h3><p class="nk-card-sub">Negócios em cada etapa agora, do vendedor escolhido</p></div></div>
+        <div class="nk-graf" data-draw="g-etapas" data-source="c_etapas" style="min-height:200px"></div>
+      </div>
+      <div class="nk-card nk-s6" id="card-aging">
+        <div class="nk-card-cab"><div><h3>Orçamentos em aberto por tempo parado</h3><p class="nk-card-sub">Dias desde a última movimentação no CRM</p></div></div>
+        <div class="nk-graf" data-draw="g-aging" data-source="c_aging" style="min-height:200px"></div>
+      </div>
+      <div class="nk-card nk-s12" id="card-mensal">
+        <div class="nk-card-cab">
+          <div><h3>Evolução mensal</h3><p class="nk-card-sub">Faturado e em aberto por mês da última movimentação, do vendedor escolhido</p></div>
+          <div class="nk-seg" role="group" aria-label="Medida da evolução mensal"><button type="button" data-med="valor" data-alvo="g-mensal" aria-pressed="true">Valor</button><button type="button" data-med="qtd" data-alvo="g-mensal" aria-pressed="false">Quantidade</button></div>
+        </div>
+        <div class="nk-graf" data-draw="g-mensal" data-source="c_mensal" style="min-height:280px"></div>
+        <div class="nk-leg"><span><i style="background:var(--nk-laranja)"></i>Faturado</span><span><i style="background:var(--nk-grafite)"></i>Em aberto (orçamento, separação, aguardando)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="nk-rodape">
+    <details>
+      <summary>Como os números são calculados</summary>
+      <ul>
+        <li>Fonte: funil [Vendas] [Omie] do CRM DataCrazy, lido pela API do CRM de hora em hora no horário comercial e por completo toda madrugada. A etapa Duplicado fica de fora.</li>
+        <li>Produtos: itens de cada negócio faturado como estão no CRM.</li>
+        <li>A data de cada negócio é a da última mudança de etapa (o CRM não informa a data de criação). Para pedidos faturados, é o dia do faturamento.</li>
+        <li>Faturado: etapa Faturado. Em aberto: Orçamento Gerado, Separação de Estoque e Aguardando Faturamento. Taxa de fechamento: faturados ÷ (faturados + em aberto).</li>
+        <li>A variação compara com o período anterior de mesmo tamanho (num mês, com o mês anterior).</li>
+        <li>Curva ABC: clientes do maior para o menor faturado; A soma os primeiros 80%, B os 15% seguintes e C os últimos 5%. Clientes agrupados pelo nome no CRM.</li>
+        <li>Recompra a cada: dias entre a primeira e a última compra divididos pelo número de intervalos entre compras.</li>
+      </ul>
+    </details>
+  </footer>
+</div>
+
+<script>
+// ===================== CÁLCULOS =====================
+dash.calc('c_periodos', {
+  title: 'Períodos do filtro',
+  description: 'Atalhos de período (todo o período, 7, 30 e 90 dias, este mês, mês passado e cada mês) contados a partir do último dia com dados, com o período anterior de mesmo tamanho para comparar.',
+  inputs: ['negocios'],
+  fn: (negocios) => {
+    const datas = negocios.map((r) => r.data).filter(Boolean).sort();
+    if (!datas.length) return [];
+    const primeira = datas[0], ref = datas[datas.length - 1];
+    const D = (s) => Date.parse(s + 'T00:00:00Z');
+    const S = (t) => new Date(t).toISOString().slice(0, 10);
+    const soma = (s, n) => S(D(s) + n * 864e5);
+    const dias = (a, b) => Math.round((D(b) - D(a)) / 864e5) + 1;
+    const inicioMes = (s) => s.slice(0, 8) + '01';
+    const mudaMes = (s, n) => { const d = new Date(D(inicioMes(s))); d.setUTCMonth(d.getUTCMonth() + n); return S(d.getTime()); };
+    const fimMes = (s) => soma(mudaMes(s, 1), -1);
+    const nomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const nomeMes = (s) => nomes[Number(s.slice(5, 7)) - 1] + '/' + s.slice(0, 4);
+    const janela = (id, nome, ini, fim) => { const n = dias(ini, fim); return { id, nome, grupo: 'atalho', ini, fim, dias: n, ant_ini: soma(ini, -n), ant_fim: soma(ini, -1) }; };
+    const mes = (id, nome, grupo, m) => {
+      const ini = inicioMes(m), fim = fimMes(m) > ref ? ref : fimMes(m), n = dias(ini, fim);
+      const aIni = mudaMes(m, -1), aFimCheio = fimMes(aIni), aFim = soma(aIni, n - 1) < aFimCheio ? soma(aIni, n - 1) : aFimCheio;
+      return { id, nome, grupo, ini, fim, dias: n, ant_ini: aIni, ant_fim: aFim };
+    };
+    const linhas = [
+      { id: 'tudo', nome: 'Todo o período', grupo: 'atalho', ini: primeira, fim: ref, dias: dias(primeira, ref), ant_ini: null, ant_fim: null },
+      janela('7d', 'Últimos 7 dias', soma(ref, -6), ref),
+      janela('30d', 'Últimos 30 dias', soma(ref, -29), ref),
+      janela('90d', 'Últimos 90 dias', soma(ref, -89), ref),
+      mes('mes', 'Este mês (' + nomeMes(ref) + ')', 'atalho', ref),
+      mes('mes_ant', 'Mês passado (' + nomeMes(mudaMes(ref, -1)) + ')', 'atalho', mudaMes(ref, -1)),
+    ];
+    const meses = [...new Set(datas.map((s) => s.slice(0, 7)))].sort().reverse();
+    for (const m of meses) linhas.push(mes(m, nomeMes(m + '-01'), 'mes', m + '-01'));
+    return linhas.map((r, ordem) => ({ ...r, ordem }));
+  },
+});
+
+dash.calc('c_kpi', {
+  title: 'Indicadores por período e vendedor',
+  description: 'Faturado, em aberto, perdido, total, ticket médio, clientes e taxa de fechamento para cada período do filtro e cada vendedor (ou Todos), com a variação sobre o período anterior.',
+  inputs: ['negocios', 'c_periodos'],
+  fn: (negocios, c_periodos) => {
+    const vendedores = ['Todos', ...new Set(negocios.map((r) => r.vendedor))];
+    const porVendedor = new Map(vendedores.map((v) => [v, v === 'Todos' ? negocios : negocios.filter((r) => r.vendedor === v)]));
+    const resumo = (lista, ini, fim) => {
+      const o = { fv: 0, fn: 0, av: 0, an: 0, pv: 0, pn: 0, cl: new Set() };
+      if (!ini) return null;
+      for (const r of lista) {
+        if (r.data < ini || r.data > fim) continue;
+        const valor = Number(r.valor) || 0;
+        if (r.status === 'lost') { o.pv += valor; o.pn += 1; }
+        else if (r.etapa === 'Faturado') { if (valor > 0) { o.fv += valor; o.fn += 1; o.cl.add(r.cliente); } }
+        else { o.av += valor; o.an += 1; }
+      }
+      return o;
+    };
+    const variacao = (a, b) => (a == null || b == null || !b ? null : a / b - 1);
+    const linhas = [];
+    for (const p of c_periodos) for (const v of vendedores) {
+      const lista = porVendedor.get(v), a = resumo(lista, p.ini, p.fim), b = resumo(lista, p.ant_ini, p.ant_fim);
+      const ticket = a.fn ? a.fv / a.fn : null, ticketAnt = b && b.fn ? b.fv / b.fn : null;
+      linhas.push({
+        periodo: p.id, vendedor: v,
+        fat_valor: a.fv, fat_n: a.fn, aberto_valor: a.av, aberto_n: a.an, perd_valor: a.pv, perd_n: a.pn,
+        total_valor: a.fv + a.av + a.pv, total_n: a.fn + a.an + a.pn, ticket, clientes: a.cl.size,
+        conv: a.fn + a.an ? a.fn / (a.fn + a.an) : null,
+        var_fat: b ? variacao(a.fv, b.fv) : null, var_ticket: b ? variacao(ticket, ticketAnt) : null, var_clientes: b ? variacao(a.cl.size, b.cl.size) : null,
+      });
+    }
+    return linhas;
+  },
+});
+
+dash.calc('c_vend', {
+  title: 'Resultado por vendedor e período',
+  description: 'Para cada período do filtro e vendedor: faturado, participação no faturado, pedidos, ticket médio, clientes, negócios e valor em aberto e taxa de fechamento.',
+  inputs: ['negocios', 'c_periodos', 'vendedores'],
+  fn: (negocios, c_periodos, vendedores) => {
+    const email = new Map(vendedores.map((v) => [String(v.vendedor).trim(), v.email]));
+    const nomes = [...new Set(negocios.map((r) => r.vendedor))];
+    const linhas = [];
+    for (const p of c_periodos) {
+      const m = new Map(nomes.map((v) => [v, { fv: 0, fn: 0, av: 0, an: 0, cl: new Set() }]));
+      let total = 0;
+      for (const r of negocios) {
+        if (r.data < p.ini || r.data > p.fim || r.status === 'lost') continue;
+        const o = m.get(r.vendedor), valor = Number(r.valor) || 0;
+        if (r.etapa === 'Faturado') { if (valor > 0) { o.fv += valor; o.fn += 1; o.cl.add(r.cliente); total += valor; } }
+        else { o.av += valor; o.an += 1; }
+      }
+      for (const [vendedor, o] of m) linhas.push({
+        periodo: p.id, vendedor, email: email.get(vendedor) || '',
+        fat_valor: o.fv, fat_n: o.fn, pct: total ? o.fv / total : null, ticket: o.fn ? o.fv / o.fn : null, clientes: o.cl.size,
+        aberto_n: o.an, aberto_valor: o.av, conv: o.fn + o.an ? o.fn / (o.fn + o.an) : null,
+      });
+    }
+    return linhas;
+  },
+});
+
+dash.calc('c_clientes', {
+  title: 'Carteira de clientes',
+  description: 'Um registro por cliente com todo o histórico: vendedor principal, curva ABC (80/15/5 do faturado), faturado, pedidos, ticket, primeira e última compra, dias sem comprar, intervalo médio de recompra, situação e valor em aberto.',
+  inputs: ['negocios'],
+  fn: (negocios) => {
+    const ref = negocios.reduce((m, r) => (r.data > m ? r.data : m), '');
+    const D = (s) => Date.parse(s + 'T00:00:00Z') / 864e5;
+    const situacao = (d) => (d == null ? 'Sem compra' : d < 30 ? 'Saudável' : d < 45 ? 'Atenção' : d < 60 ? 'Risco' : d < 90 ? 'Crítico' : 'Inativo');
+    const por = new Map();
+    for (const r of negocios) {
+      if (r.status === 'lost' || !r.cliente) continue;
+      const c = por.get(r.cliente) || { receita: 0, pedidos: 0, dias: new Set(), vend: new Map(), av: 0, an: 0 };
+      const valor = Number(r.valor) || 0;
+      if (r.etapa === 'Faturado') { if (valor > 0) { c.receita += valor; c.pedidos += 1; c.dias.add(r.data); c.vend.set(r.vendedor, (c.vend.get(r.vendedor) || 0) + valor); } }
+      else { c.av += valor; c.an += 1; if (!c.pedidos) c.vend.set(r.vendedor, (c.vend.get(r.vendedor) || 0) + 1e-6); }
+      por.set(r.cliente, c);
+    }
+    const lista = [...por.entries()].sort((a, b) => b[1].receita - a[1].receita);
+    const total = lista.reduce((s, [, c]) => s + c.receita, 0);
+    let acum = 0;
+    return lista.map(([cliente, c]) => {
+      const antes = total ? acum / total : 1; acum += c.receita;
+      const ds = [...c.dias].sort(), primeira = ds[0] || null, ultima = ds[ds.length - 1] || null;
+      const dias = ultima ? Math.round(D(ref) - D(ultima)) : null;
+      const vend = [...c.vend.entries()].sort((a, b) => b[1] - a[1])[0];
+      return {
+        cliente, vendedor: vend ? vend[0] : 'Sem vendedor', abc: c.receita > 0 ? (antes < 0.8 ? 'A' : antes < 0.95 ? 'B' : 'C') : '—',
+        receita: c.receita, pedidos: c.pedidos, ticket: c.pedidos ? c.receita / c.pedidos : null,
+        primeira, ultima, dias, ciclo_medio: ds.length > 1 ? Math.round((D(ultima) - D(primeira)) / (ds.length - 1)) : null,
+        situacao: situacao(dias), aberto_n: c.an, aberto_valor: c.av,
+      };
+    });
+  },
+});
+
+dash.calc('c_situacao', {
+  title: 'Carteira por situação',
+  description: 'Clientes, faturado e valor em aberto em cada faixa de dias sem comprar, para todos e para cada vendedor principal.',
+  inputs: ['c_clientes'],
+  fn: (c_clientes) => {
+    const vendedores = ['Todos', ...new Set(c_clientes.map((c) => c.vendedor))];
+    const faixas = ['Saudável', 'Atenção', 'Risco', 'Crítico', 'Inativo', 'Sem compra'];
+    return vendedores.flatMap((vendedor) => faixas.map((situacao) => {
+      const cs = c_clientes.filter((c) => c.situacao === situacao && (vendedor === 'Todos' || c.vendedor === vendedor));
+      return { vendedor, situacao, clientes: cs.length, receita: cs.reduce((s, c) => s + c.receita, 0), aberto_valor: cs.reduce((s, c) => s + c.aberto_valor, 0) };
+    }));
+  },
+});
+
+dash.calc('c_etapas', {
+  title: 'Negócios por etapa',
+  description: 'Quantidade e valor dos negócios em cada etapa do funil de vendas hoje, para todos e por vendedor.',
+  inputs: ['negocios'],
+  fn: (negocios) => {
+    const etapas = ['Orçamento Gerado', 'Separação de Estoque', 'Aguardando Faturamento', 'Faturado'];
+    const vendedores = ['Todos', ...new Set(negocios.map((r) => r.vendedor))];
+    return vendedores.flatMap((vendedor) => etapas.map((etapa, ordem) => {
+      const rs = negocios.filter((r) => r.etapa === etapa && (vendedor === 'Todos' || r.vendedor === vendedor));
+      return { vendedor, etapa, ordem, negocios: rs.length, valor: rs.reduce((s, r) => s + (Number(r.valor) || 0), 0) };
+    }));
+  },
+});
+
+dash.calc('c_aging', {
+  title: 'Orçamentos por tempo parado',
+  description: 'Orçamentos em aberto (etapa Orçamento Gerado) pelos dias desde a última movimentação, para todos e por vendedor.',
+  inputs: ['negocios'],
+  fn: (negocios) => {
+    const ref = negocios.reduce((m, r) => (r.data > m ? r.data : m), '');
+    const D = (s) => Date.parse(s + 'T00:00:00Z') / 864e5;
+    const faixas = [['Até 7 dias', 0, 7], ['8 a 30 dias', 8, 30], ['31 a 60 dias', 31, 60], ['61 a 90 dias', 61, 90], ['Mais de 90 dias', 91, 1e9]];
+    const orcamentos = negocios.filter((r) => r.etapa === 'Orçamento Gerado');
+    const vendedores = ['Todos', ...new Set(negocios.map((r) => r.vendedor))];
+    return vendedores.flatMap((vendedor) => faixas.map(([faixa, de, ate], ordem) => {
+      const rs = orcamentos.filter((r) => { const d = D(ref) - D(r.data); return d >= de && d <= ate && (vendedor === 'Todos' || r.vendedor === vendedor); });
+      return { vendedor, faixa, ordem, negocios: rs.length, valor: rs.reduce((s, r) => s + (Number(r.valor) || 0), 0) };
+    }));
+  },
+});
+
+dash.calc('c_mensal', {
+  title: 'Faturado e em aberto por mês',
+  description: 'Por mês da última movimentação: valor e quantidade de negócios faturados e em aberto, para todos e por vendedor.',
+  inputs: ['negocios'],
+  fn: (negocios) => {
+    const m = new Map();
+    for (const r of negocios) {
+      if (r.status === 'lost') continue;
+      const valor = Number(r.valor) || 0;
+      if (r.etapa === 'Faturado' && !(valor > 0)) continue;
+      for (const vendedor of ['Todos', r.vendedor]) {
+        const k = r.data.slice(0, 7) + '|' + vendedor;
+        const o = m.get(k) || { mes: r.data.slice(0, 7), vendedor, fat_valor: 0, fat_n: 0, aberto_valor: 0, aberto_n: 0 };
+        if (r.etapa === 'Faturado') { o.fat_valor += valor; o.fat_n += 1; } else { o.aberto_valor += valor; o.aberto_n += 1; }
+        m.set(k, o);
+      }
+    }
+    return [...m.values()].sort((a, b) => a.mes.localeCompare(b.mes));
+  },
+});
+</script>
+
+<script>
+// ===================== UTILIDADES =====================
+window.NK = (function () {
+  const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const mesesLongos = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const num = (v, d) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const vazio = (v) => v == null || Number.isNaN(Number(v));
+  const f = {
+    brl: (v) => (vazio(v) ? '—' : 'R$ ' + num(v, 2)),
+    brl0: (v) => (vazio(v) ? '—' : 'R$ ' + num(v, 0)),
+    brlK: (v) => {
+      if (vazio(v)) return '—';
+      const a = Math.abs(v);
+      if (a >= 1e6) return 'R$ ' + num(v / 1e6, 2) + 'M';
+      if (a >= 1e3) return 'R$ ' + num(v / 1e3, 2) + 'K';
+      return 'R$ ' + num(v, 2);
+    },
+    curto: (v) => {
+      if (vazio(v)) return '';
+      const a = Math.abs(v);
+      if (a >= 1e6) return num(v / 1e6, 1) + 'M';
+      if (a >= 1e3) return num(v / 1e3, a >= 1e4 ? 0 : 1) + 'K';
+      return num(v, 0);
+    },
+    int: (v) => (vazio(v) ? '—' : num(v, 0)),
+    pct: (v, d = 1) => (vazio(v) ? '—' : num(v * 100, d) + '%'),
+    data: (s) => (s ? s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4) : '—'),
+    dm: (s) => s.slice(8, 10) + '/' + s.slice(5, 7),
+    mes: (k) => meses[Number(k.slice(5, 7)) - 1] + '/' + k.slice(2, 4),
+    mesLongo: (k) => mesesLongos[Number(k.slice(5, 7)) - 1] + '/' + k.slice(0, 4),
+    dias: (v) => (v == null ? '—' : v + (v === 1 ? ' dia' : ' dias')),
+  };
+  const D = (s) => Date.parse(s + 'T00:00:00Z');
+  const soma = (s, n) => new Date(D(s) + n * 864e5).toISOString().slice(0, 10);
+  const segunda = (s) => { const dia = new Date(D(s)).getUTCDay(); return soma(s, -((dia + 6) % 7)); };
+  const cores = ['#f26b1d', '#2e2e2e', '#f79a5e', '#6b6b70', '#c4500f', '#a8a8ae', '#fbc59f', '#45454a', '#d6d6da', '#8a3a12', '#ffb27a'];
+  const corSit = { 'Saudável': 'var(--nk-ok)', 'Atenção': 'var(--nk-atencao)', 'Risco': 'var(--nk-risco)', 'Crítico': 'var(--nk-critico)', 'Inativo': 'var(--nk-inativo)', 'Sem compra': 'var(--nk-sem)' };
+
+  function filtro() {
+    const p = dash.params();
+    const periodo = !p.periodo || p.periodo === 'Todos' ? 'tudo' : p.periodo;
+    return { periodo, vendedor: p.vendedor || 'Todos' };
+  }
+  function per(linhas) {
+    const { periodo } = filtro();
+    return linhas.find((r) => r.id === periodo) || linhas[0];
+  }
+  const enc = (v) => String(v).replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D');
+  const w = (pares) => pares.map(([k, v]) => k + '=' + enc(v)).join('&');
+  const chave = (...vals) => vals.map((v) => String(v).replace(/%/g, '%25').replace(/,/g, '%2C')).join(',');
+
+  // Devolve true quando o elemento já foi tratado (carregando ou erro).
+  function falha(el, fontes, tabela) {
+    const ruim = fontes.find((d) => ['error', 'declined', 'missing'].includes(d.status));
+    if (ruim) {
+      el.replaceChildren();
+      if (tabela) { const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 20; td.className = 'txt'; td.textContent = 'Falha ao carregar'; tr.appendChild(td); el.appendChild(tr); }
+      else { const s = document.createElement('div'); s.className = 'nk-erro'; s.textContent = 'Falha ao carregar'; el.appendChild(s); }
+      return true;
+    }
+    if (fontes.some((d) => d.status !== 'ok')) { el.replaceChildren(); return true; }
+    return false;
+  }
+
+  function dica(box) {
+    let t = box.querySelector(':scope > .nk-dica');
+    if (!t) { t = document.createElement('div'); t.className = 'nk-dica'; t.hidden = true; box.appendChild(t); }
+    return {
+      mostra(ev, titulo, linhas) {
+        t.replaceChildren();
+        const h = document.createElement('div'); h.className = 't'; h.textContent = titulo; t.appendChild(h);
+        for (const l of linhas) {
+          const d = document.createElement('div'); d.className = 'l';
+          if (l.cor) { const i = document.createElement('i'); i.style.background = l.cor; d.appendChild(i); }
+          d.append(l.txt ?? l); t.appendChild(d);
+        }
+        t.hidden = false;
+        const r = box.getBoundingClientRect();
+        let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
+        if (x + t.offsetWidth > r.width) x = Math.max(0, ev.clientX - r.left - t.offsetWidth - 14);
+        if (y + t.offsetHeight > r.height) y = Math.max(0, ev.clientY - r.top - t.offsetHeight - 14);
+        t.style.left = x + 'px'; t.style.top = y + 'px';
+      },
+      esconde() { t.hidden = true; },
+    };
+  }
+
+  function medeTexto(svg, textos, classe) {
+    const t = svg.append('text').attr('class', classe || '');
+    let m = 0;
+    for (const s of textos) { t.text(s); m = Math.max(m, t.node().getComputedTextLength()); }
+    t.remove();
+    return m;
+  }
+
+  function linhaTabela(tb, r, cols, key) {
+    const tr = document.createElement('tr');
+    if (key != null) tr.dataset.key = key;
+    for (const c of cols) {
+      const td = document.createElement('td');
+      if (c.cls) td.className = c.cls;
+      const v = c.fn(r, td);
+      if (v != null) td.append(v);
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  }
+
+  function ordena(linhas, est) {
+    if (!est || !est.f) return linhas;
+    const k = est.f, s = est.dir === 'asc' ? 1 : -1;
+    return [...linhas].sort((a, b) => {
+      const x = a[k], y = b[k];
+      if (x == null || x === '—') return 1; if (y == null || y === '—') return -1;
+      return typeof x === 'number' ? (x - y) * s : String(x).localeCompare(String(y), 'pt-BR') * s;
+    });
+  }
+
+  function pill(c) { const s = document.createElement('span'); s.className = 'nk-pill ' + (c === '—' ? 'X' : c); s.textContent = c === '—' ? 'sem compra' : c; return s; }
+  function sit(c) { const s = document.createElement('span'); s.className = 'nk-sit'; s.style.setProperty('--cor', corSit[c]); s.textContent = c; return s; }
+
+  // Curva ABC do período e vendedor escolhidos (guardada até mudar algo).
+  let memo = { k: null, v: null };
+  function abc(negocios, p, vendedor) {
+    const k = [p.ini, p.fim, vendedor, negocios.length].join('|');
+    if (memo.k === k && memo.src === negocios) return memo.v;
+    const por = new Map();
+    for (const r of negocios) {
+      if (r.etapa !== 'Faturado' || r.status === 'lost' || r.data < p.ini || r.data > p.fim) continue;
+      if (vendedor !== 'Todos' && r.vendedor !== vendedor) continue;
+      const valor = Number(r.valor) || 0; if (!(valor > 0)) continue;
+      const c = por.get(r.cliente) || { receita: 0, pedidos: 0, vend: new Map() };
+      c.receita += valor; c.pedidos += 1; c.vend.set(r.vendedor, (c.vend.get(r.vendedor) || 0) + valor);
+      por.set(r.cliente, c);
+    }
+    const ord = [...por.entries()].sort((a, b) => b[1].receita - a[1].receita);
+    const total = ord.reduce((s, [, c]) => s + c.receita, 0);
+    const tot = { A: { clientes: 0, receita: 0, pedidos: 0 }, B: { clientes: 0, receita: 0, pedidos: 0 }, C: { clientes: 0, receita: 0, pedidos: 0 } };
+    let acum = 0;
+    const lista = ord.map(([cliente, c], i) => {
+      const antes = acum / total; acum += c.receita;
+      const classe = antes < 0.8 ? 'A' : antes < 0.95 ? 'B' : 'C';
+      tot[classe].clientes += 1; tot[classe].receita += c.receita; tot[classe].pedidos += c.pedidos;
+      return { pos: i + 1, cliente, abc: classe, receita: c.receita, pedidos: c.pedidos, ticket: c.receita / c.pedidos, pct: c.receita / total, acum: acum / total,
+        vendedor: [...c.vend.entries()].sort((a, b) => b[1] - a[1])[0][0] };
+    });
+    memo = { k, src: negocios, v: { lista, tot, total, n: lista.length } };
+    return memo.v;
+  }
+
+  return { f, D, soma, segunda, cores, corSit, filtro, per, w, chave, falha, dica, medeTexto, linhaTabela, ordena, pill, sit, abc,
+    med: { 'g-diario': 'valor', 'g-donut': 'valor', 'g-mensal': 'valor' },
+    lim: { 't-abc': 50, 't-carteira': 50 },
+    busca: { 't-abc': '', 't-carteira': '' },
+    fabc: '', cabc: '', fsit: '',
+    sort: { 't-vend': { f: 'fat_valor', dir: 'desc' }, 't-carteira': { f: 'receita', dir: 'desc' } },
+    animou: {},
+  };
+})();
+</script>
+
+<script>
+// ===================== ABAS, FILTROS E CONTROLES (só ouvem e trocam atributos) =====================
+(function () {
+  const abas = [...document.querySelectorAll('.nk-abas [data-pag]')];
+  const mostra = (pag) => {
+    abas.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pag === pag)));
+    document.querySelectorAll('.nk-pagina').forEach((s) => { s.hidden = s.id !== pag; });
+    dash.setLink(pag);
+  };
+  abas.forEach((b) => b.addEventListener('click', () => mostra(b.dataset.pag)));
+  const inicial = location.hash.slice(1);
+  if (abas.some((b) => b.dataset.pag === inicial)) mostra(inicial);
+
+  document.querySelectorAll('#f-limpar').forEach((b) => b.addEventListener('click', () => dash.setParams({ periodo: 'tudo', vendedor: 'Todos' })));
+
+  document.querySelectorAll('[data-med][data-alvo]').forEach((b) => b.addEventListener('click', () => {
+    const alvo = b.dataset.alvo;
+    b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    window.NK.med[alvo] = b.dataset.med;
+    dash.draw(alvo);
+  }));
+
+  document.querySelectorAll('.nk-mais[data-alvo]').forEach((b) => b.addEventListener('click', () => {
+    window.NK.lim[b.dataset.alvo] += 100;
+    dash.draw(b.dataset.alvo);
+  }));
+
+  const busca = (id, alvo) => document.querySelectorAll('#' + id).forEach((i) => i.addEventListener('input', () => {
+    window.NK.busca[alvo] = i.value.trim().toUpperCase(); window.NK.lim[alvo] = 50; dash.draw(alvo);
+  }));
+  busca('abc-busca', 't-abc'); busca('cart-busca', 't-carteira');
+
+  const seg = (attr, chave, alvo) => document.querySelectorAll('[' + attr + ']').forEach((b) => b.addEventListener('click', () => {
+    b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    window.NK[chave] = b.getAttribute(attr); window.NK.lim[alvo] = 50; dash.draw(alvo);
+  }));
+  seg('data-abc', 'fabc', 't-abc'); seg('data-cabc', 'cabc', 't-carteira');
+
+  document.querySelectorAll('.nk-sit-c[data-sit]').forEach((b) => b.addEventListener('click', () => {
+    const v = window.NK.fsit === b.dataset.sit ? '' : b.dataset.sit;
+    window.NK.fsit = v;
+    document.querySelectorAll('.nk-sit-c[data-sit]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.sit === v)));
+    window.NK.lim['t-carteira'] = 50; dash.draw('t-carteira');
+  }));
+
+  for (const id of ['t-vend', 't-carteira']) {
+    document.querySelectorAll('#' + id + ' th[data-field] button').forEach((b) => b.addEventListener('click', () => {
+      const th = b.closest('th'), est = window.NK.sort[id], f = th.dataset.field;
+      est.dir = est.f === f && est.dir === 'desc' ? 'asc' : 'desc'; est.f = f;
+      th.closest('tr').querySelectorAll('th').forEach((x) => x.removeAttribute('aria-sort'));
+      th.setAttribute('aria-sort', est.dir === 'desc' ? 'descending' : 'ascending');
+      dash.draw(id);
+    }));
+  }
+})();
+</script>
+
+<script>
+// ===================== CABEÇALHO E FILTROS =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+
+  dash.draw('ref', (el) => {
+    const d = dash.data('c_periodos');
+    const r = d.status === 'ok' ? d.data.find((x) => x.id === 'tudo') : null;
+    el.textContent = r ? F.data(r.fim) : '—';
+  });
+
+  dash.draw('f-periodo', (sel) => {
+    const d = dash.data('c_periodos');
+    const linhas = d.status === 'ok' ? d.data : [];
+    const g1 = document.createElement('optgroup'); g1.label = 'Atalhos';
+    const g2 = document.createElement('optgroup'); g2.label = 'Meses';
+    for (const r of linhas) (r.grupo === 'mes' ? g2 : g1).appendChild(new Option(r.nome, r.id));
+    sel.replaceChildren(...(linhas.length ? [g1, g2] : [new Option('Todo o período', 'tudo')]));
+    sel.value = NK.filtro().periodo;
+    sel.onchange = () => dash.setParams({ periodo: sel.value });
+  });
+
+  dash.draw('f-vendedor', (sel) => {
+    const d = dash.data('c_vend');
+    const linhas = d.status === 'ok' ? d.data.filter((r) => r.periodo === 'tudo').sort((a, b) => b.fat_valor - a.fat_valor) : [];
+    sel.replaceChildren(new Option('Todos os vendedores', 'Todos'), ...linhas.map((r) => new Option(r.vendedor, r.vendedor)));
+    sel.value = NK.filtro().vendedor;
+    sel.onchange = () => dash.setParams({ vendedor: sel.value });
+  });
+
+  for (const [nome, campo] of [['intervalo-ini', 'ini'], ['intervalo-fim', 'fim']]) {
+    dash.draw(nome, (el) => {
+      const d = dash.data('c_periodos');
+      el.textContent = d.status === 'ok' && d.data.length ? F.data(NK.per(d.data)[campo]) : '—';
+    });
+  }
+})();
+</script>
+
+<script>
+// ===================== VISÃO GERAL =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+
+  dash.draw('kpi', (el) => {
+    const d = dash.data('c_kpi');
+    const { periodo, vendedor } = NK.filtro();
+    el.setAttribute('data-where', NK.w([['periodo', periodo], ['vendedor', vendedor]]));
+    if (d.status !== 'loading') el.classList.remove('dash-skeleton');
+    const r = d.status === 'ok' ? d.data.find((x) => x.periodo === periodo && x.vendedor === vendedor) : null;
+    const v = r ? r[el.dataset.field] : null;
+    const fmt = el.dataset.fmt;
+    el.textContent = !r ? '—' : fmt === 'brlK' ? F.brlK(v) : fmt === 'brl' ? F.brl(v) : fmt === 'pct' ? F.pct(v) : F.int(v);
+  });
+
+  dash.draw('var', (el) => {
+    const d = dash.data('c_kpi');
+    const { periodo, vendedor } = NK.filtro();
+    el.setAttribute('data-where', NK.w([['periodo', periodo], ['vendedor', vendedor]]));
+    const r = d.status === 'ok' ? d.data.find((x) => x.periodo === periodo && x.vendedor === vendedor) : null;
+    const v = r ? r[el.dataset.field] : null;
+    el.classList.remove('bom', 'ruim', 'neutro');
+    if (periodo === 'tudo') { el.classList.add('neutro'); el.textContent = 'todo o histórico'; return; }
+    if (v == null) { el.classList.add('neutro'); el.textContent = 'sem base para comparar'; return; }
+    el.classList.add(v >= 0 ? 'bom' : 'ruim');
+    el.textContent = (v >= 0 ? '▲ +' : '▼ ') + F.pct(v) + ' vs período anterior';
+  });
+
+  dash.draw('g-diario', (el) => {
+    const n = dash.data('negocios'), p = dash.data('c_periodos');
+    if (NK.falha(el, [n, p])) return;
+    const per = NK.per(p.data), { vendedor } = NK.filtro(), med = NK.med['g-diario'];
+    const modo = per.dias <= 45 ? 'dia' : per.dias <= 200 ? 'semana' : 'mes';
+    const chave = (s) => (modo === 'dia' ? s : modo === 'semana' ? NK.segunda(s) : s.slice(0, 7));
+    const m = new Map();
+    for (let s = per.ini; s <= per.fim; s = NK.soma(s, 1)) { const k = chave(s); if (!m.has(k)) m.set(k, { k, fat: 0, ab: 0, fn: 0, an: 0 }); }
+    for (const r of n.data) {
+      if (r.data < per.ini || r.data > per.fim || r.status === 'lost') continue;
+      if (vendedor !== 'Todos' && r.vendedor !== vendedor) continue;
+      const o = m.get(chave(r.data)); if (!o) continue;
+      const v = Number(r.valor) || 0;
+      if (r.etapa === 'Faturado') { if (v > 0) { o.fat += v; o.fn += 1; } } else { o.ab += v; o.an += 1; }
+    }
+    const rows = [...m.values()];
+    const a = (r) => (med === 'valor' ? r.fat : r.fn), b = (r) => (med === 'valor' ? r.ab : r.an);
+    const fmtEixo = med === 'valor' ? (v) => 'R$ ' + F.curto(v) : (v) => F.int(v);
+    const rotulo = (k) => (modo === 'mes' ? F.mes(k) : F.dm(k));
+    const W = Math.max(280, el.clientWidth || 600), H = 280;
+    el.replaceChildren();
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Barras empilhadas de faturado e em aberto por ' + modo);
+    const max = d3.max(rows, (r) => a(r) + b(r)) || 1;
+    const y = d3.scaleLinear([0, max], [H - 28, 12]).nice();
+    const ticks = y.ticks(5);
+    const ml = Math.ceil(NK.medeTexto(svg, ticks.map(fmtEixo))) + 12;
+    const x = d3.scaleBand(rows.map((r) => r.k), [ml, W - 4]).padding(rows.length > 40 ? 0.15 : 0.25);
+    svg.append('g').attr('class', 'eixo').selectAll('line').data(ticks).join('line')
+      .attr('x1', ml).attr('x2', W - 4).attr('y1', (t) => y(t)).attr('y2', (t) => y(t));
+    svg.append('g').attr('class', 'eixo').selectAll('text').data(ticks).join('text')
+      .attr('x', ml - 8).attr('y', (t) => y(t)).attr('dy', '.32em').attr('text-anchor', 'end').text(fmtEixo);
+    const larg = NK.medeTexto(svg, ['00/00']) + 10;
+    const passo = Math.max(1, Math.ceil(larg / x.step()));
+    svg.append('g').attr('class', 'eixo').selectAll('text').data(rows.filter((r, i) => i % passo === 0)).join('text')
+      .attr('x', (r) => x(r.k) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').text((r) => rotulo(r.k));
+    const dc = NK.dica(el);
+    const g = svg.append('g').selectAll('g').data(rows).join('g');
+    g.append('rect').attr('x', (r) => x(r.k)).attr('width', x.bandwidth()).attr('y', (r) => y(a(r))).attr('height', (r) => y(0) - y(a(r)))
+      .style('fill', 'var(--nk-laranja)');
+    g.append('rect').attr('x', (r) => x(r.k)).attr('width', x.bandwidth()).attr('y', (r) => y(a(r) + b(r))).attr('height', (r) => y(a(r)) - y(a(r) + b(r)))
+      .style('fill', 'var(--nk-grafite)');
+    g.append('rect').attr('x', (r) => x(r.k)).attr('width', x.step()).attr('y', 0).attr('height', H - 28).attr('transform', `translate(${-(x.step() - x.bandwidth()) / 2},0)`)
+      .style('fill', 'transparent')
+      .on('mousemove', (ev, r) => dc.mostra(ev, modo === 'dia' ? F.data(r.k) : modo === 'semana' ? 'Semana de ' + F.data(r.k) : F.mesLongo(r.k), [
+        { cor: 'var(--nk-laranja)', txt: `Faturado: ${F.brl(r.fat)} · ${F.int(r.fn)} negócios` },
+        { cor: 'var(--nk-grafite)', txt: `Em aberto: ${F.brl(r.ab)} · ${F.int(r.an)} negócios` },
+      ]))
+      .on('mouseleave', () => dc.esconde());
+  });
+
+  dash.draw('g-donut', (el) => {
+    const d = dash.data('c_vend');
+    if (NK.falha(el, [d])) return;
+    const { periodo, vendedor } = NK.filtro(), med = NK.med['g-donut'];
+    const val = (r) => (med === 'valor' ? r.fat_valor : r.fat_n);
+    const rows = d.data.filter((r) => r.periodo === periodo && val(r) > 0).sort((a, b) => val(b) - val(a));
+    el.replaceChildren();
+    if (!rows.length) { const s = document.createElement('div'); s.className = 'nk-aviso'; s.textContent = 'Nenhum pedido faturado neste período.'; el.appendChild(s); return; }
+    const total = d3.sum(rows, val);
+    const cor = new Map(rows.map((r, i) => [r.vendedor, NK.cores[i % NK.cores.length]]));
+    const box = document.createElement('div'); box.className = 'nk-graf'; box.style.minHeight = '200px'; el.appendChild(box);
+    const S = Math.min(220, Math.max(160, el.clientWidth - 20)), R = S / 2;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('height', S).attr('viewBox', `${-R} ${-R} ${S} ${S}`)
+      .attr('role', 'img').attr('aria-label', 'Participação de cada vendedor no faturado');
+    const arcos = d3.pie().value(val).sort(null).padAngle(0.012)(rows);
+    const arco = d3.arc().innerRadius(R * 0.62).outerRadius(R - 4).cornerRadius(2);
+    const dc = NK.dica(box);
+    svg.selectAll('path').data(arcos).join('path').attr('d', arco).style('fill', (a) => cor.get(a.data.vendedor))
+      .style('opacity', (a) => (vendedor === 'Todos' || a.data.vendedor === vendedor ? 1 : 0.3)).style('cursor', 'pointer')
+      .on('mousemove', (ev, a) => dc.mostra(ev, a.data.vendedor, [F.pct(val(a.data) / total), F.brl(a.data.fat_valor), F.int(a.data.fat_n) + ' pedidos']))
+      .on('mouseleave', () => dc.esconde())
+      .on('click', (ev, a) => dash.setParams({ vendedor: vendedor === a.data.vendedor ? 'Todos' : a.data.vendedor }));
+    svg.append('text').attr('text-anchor', 'middle').attr('y', -4).attr('class', 'rot').style('font-size', '16px')
+      .text(med === 'valor' ? F.brlK(total) : F.int(total));
+    svg.append('text').attr('text-anchor', 'middle').attr('y', 16).text(med === 'valor' ? 'faturado' : 'pedidos');
+    const leg = document.createElement('div'); leg.className = 'nk-donut-leg'; el.appendChild(leg);
+    for (const r of rows) {
+      const l = document.createElement('div');
+      const i = document.createElement('i'); i.style.background = cor.get(r.vendedor);
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = r.vendedor;
+      const p = document.createElement('span'); p.className = 'p'; p.textContent = F.pct(val(r) / total);
+      const v = document.createElement('span'); v.className = 'v'; v.textContent = med === 'valor' ? F.brlK(r.fat_valor) : F.int(r.fat_n) + ' ped.';
+      l.append(i, n, p, v); leg.appendChild(l);
+    }
+  });
+
+  dash.draw('t-atendentes', (tb) => {
+    const d = dash.data('c_vend');
+    if (NK.falha(tb, [d], true)) return;
+    const { periodo } = NK.filtro();
+    const rows = d.data.filter((r) => r.periodo === periodo && r.fat_n > 0).sort((a, b) => b.fat_valor - a.fat_valor);
+    tb.replaceChildren();
+    const cols = [
+      { cls: 'txt', fn: (r) => {
+        const w = document.createElement('div'); w.className = 'nk-pessoa';
+        const av = document.createElement('span'); av.className = 'nk-av'; av.textContent = (r.vendedor || '?').trim().charAt(0).toUpperCase();
+        const t = document.createElement('div');
+        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.vendedor;
+        const em = document.createElement('div'); em.className = 'em'; em.textContent = r.email || ' ';
+        t.append(nm, em); w.append(av, t); return w; } },
+      { fn: (r) => F.int(r.fat_n) },
+      { fn: (r) => F.brlK(r.ticket) },
+      { cls: 'verde', fn: (r) => F.brlK(r.fat_valor) },
+    ];
+    for (const r of rows) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
+  });
+
+  dash.draw('t-top', (tb) => {
+    const n = dash.data('negocios'), p = dash.data('c_periodos');
+    if (NK.falha(tb, [n, p], true)) return;
+    const res = NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor);
+    tb.replaceChildren();
+    const cols = [{ cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => F.int(r.pedidos) }, { fn: (r) => F.brlK(r.ticket) }, { cls: 'verde', fn: (r) => F.brlK(r.receita) }];
+    for (const r of res.lista.slice(0, 10)) NK.linhaTabela(tb, r, cols);
+  });
+})();
+</script>
+
+<script>
+// ===================== VENDEDORES =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+
+  dash.draw('t-vend', (tb) => {
+    const d = dash.data('c_vend');
+    if (NK.falha(tb, [d], true)) return;
+    const { periodo, vendedor } = NK.filtro();
+    const rows = NK.ordena(d.data.filter((r) => r.periodo === periodo && (r.fat_n > 0 || r.aberto_n > 0)), NK.sort['t-vend']);
+    const max = d3.max(rows, (r) => r.fat_valor) || 1;
+    tb.replaceChildren();
+    const cols = [
+      { cls: 'txt', fn: (r, td) => { if (r.vendedor === vendedor) td.classList.add('forte'); return r.vendedor; } },
+      { fn: (r) => { const f = document.createDocumentFragment(); f.append(F.brl(r.fat_valor)); const b = document.createElement('span'); b.className = 'nk-barra-cel esconde-estreito'; b.style.width = Math.round(50 * r.fat_valor / max) + 'px'; f.append(b); return f; } },
+      { fn: (r) => F.pct(r.pct) },
+      { fn: (r) => F.int(r.fat_n) },
+      { fn: (r) => F.brl(r.ticket) },
+      { fn: (r) => F.int(r.clientes) },
+      { cls: 'esconde-estreito', fn: (r) => F.int(r.aberto_n) },
+      { cls: 'esconde-estreito', fn: (r) => F.brl(r.aberto_valor) },
+      { fn: (r) => F.pct(r.conv) },
+    ];
+    for (const r of rows) NK.linhaTabela(tb, r, cols, NK.chave(r.periodo, r.vendedor));
+  });
+
+  dash.draw('t-calor', (tab) => {
+    const d = dash.data('c_mensal');
+    if (NK.falha(tab, [d], true)) return;
+    const linhas = d.data.filter((r) => r.vendedor !== 'Todos');
+    const meses = [...new Set(d.data.map((r) => r.mes))].sort();
+    const por = new Map();
+    for (const r of linhas) { const o = por.get(r.vendedor) || { vendedor: r.vendedor, total: 0, m: {} }; o.m[r.mes] = r.fat_valor; o.total += r.fat_valor; por.set(r.vendedor, o); }
+    const rows = [...por.values()].filter((o) => o.total > 0).sort((a, b) => b.total - a.total);
+    const max = d3.max(rows, (o) => d3.max(meses, (m) => o.m[m] || 0)) || 1;
+    tab.replaceChildren();
+    const th = (t, cls) => { const e = document.createElement('th'); if (cls) e.className = cls; e.textContent = t; return e; };
+    const thead = document.createElement('thead'), tr = document.createElement('tr');
+    tr.append(th('Vendedor', 'txt'), ...meses.map((m) => th(F.mes(m))), th('Total'));
+    thead.appendChild(tr); tab.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    const { vendedor } = NK.filtro();
+    for (const o of rows) {
+      const r = document.createElement('tr');
+      const n = document.createElement('td'); n.className = 'txt' + (o.vendedor === vendedor ? ' forte' : ''); n.textContent = o.vendedor; r.appendChild(n);
+      for (const m of meses) {
+        const v = o.m[m] || 0, td = document.createElement('td'); td.className = 'c';
+        td.textContent = v ? F.brlK(v) : '—';
+        const a = v / max;
+        td.style.background = v ? `rgba(242,107,29,${(0.08 + 0.75 * a).toFixed(2)})` : '';
+        td.style.color = a > 0.55 ? '#fff' : '';
+        r.appendChild(td);
+      }
+      const t = document.createElement('td'); t.className = 'forte'; t.textContent = F.brlK(o.total); r.appendChild(t);
+      tbody.appendChild(r);
+    }
+    tab.appendChild(tbody);
+  });
+})();
+</script>
+
+<script>
+// ===================== CURVA ABC =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+  const dados = () => {
+    const n = dash.data('negocios'), p = dash.data('c_periodos');
+    return { n, p, ok: n.status === 'ok' && p.status === 'ok' && p.data.length };
+  };
+
+  dash.draw('abc-card', (el) => {
+    const { n, p, ok } = dados();
+    if (!ok) { el.textContent = '—'; return; }
+    const res = NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor);
+    const t = res.tot[el.dataset.classe], c = el.dataset.campo;
+    el.textContent = c === 'receita' ? F.brlK(t.receita) : c === 'clientes' ? F.int(t.clientes)
+      : c === 'pct_cli' ? F.pct(res.n ? t.clientes / res.n : null) : c === 'pct_rec' ? F.pct(res.total ? t.receita / res.total : null)
+      : F.brl(t.pedidos ? t.receita / t.pedidos : null);
+  });
+
+  dash.draw('abc-cont', (el) => {
+    const { n, p, ok } = dados();
+    el.textContent = ok ? F.int(NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor).n) + ' clientes compraram' : '—';
+  });
+
+  dash.draw('g-pareto', (el) => {
+    const { n, p } = dados();
+    if (NK.falha(el, [n, p])) return;
+    const res = NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor);
+    el.replaceChildren();
+    if (!res.n) { const s = document.createElement('div'); s.className = 'nk-aviso'; s.textContent = 'Nenhum pedido faturado neste período.'; el.appendChild(s); return; }
+    const W = Math.max(280, el.clientWidth || 600), H = 280, m = { t: 26, r: 12, b: 30, l: 44 };
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Curva ABC: faturado acumulado por percentual de clientes');
+    const x = d3.scaleLinear([0, 1], [m.l, W - m.r]), y = d3.scaleLinear([0, 1], [H - m.b, m.t]);
+    const pts = [{ x: 0, y: 0 }, ...res.lista.map((r, i) => ({ x: (i + 1) / res.n, y: r.acum, r }))];
+    const fimA = res.tot.A.clientes / res.n, fimB = (res.tot.A.clientes + res.tot.B.clientes) / res.n;
+    const zonas = [['A', 0, fimA, 'rgba(242,107,29,.10)'], ['B', fimA, fimB, 'rgba(46,46,46,.07)'], ['C', fimB, 1, 'rgba(184,184,190,.12)']];
+    svg.append('g').selectAll('rect').data(zonas).join('rect').attr('x', (z) => x(z[1])).attr('width', (z) => Math.max(0, x(z[2]) - x(z[1])))
+      .attr('y', m.t).attr('height', H - m.b - m.t).style('fill', (z) => z[3]);
+    svg.append('g').selectAll('text').data(zonas.filter((z) => x(z[2]) - x(z[1]) > 26)).join('text').attr('class', 'rot')
+      .attr('x', (z) => (x(z[1]) + x(z[2])) / 2).attr('y', m.t - 8).attr('text-anchor', 'middle').text((z) => z[0]);
+    svg.append('g').attr('class', 'eixo').selectAll('line').data([0.8, 0.95]).join('line').attr('x1', m.l).attr('x2', W - m.r)
+      .attr('y1', (v) => y(v)).attr('y2', (v) => y(v)).style('stroke', 'var(--nk-texto-3)').style('stroke-dasharray', '4 4');
+    svg.append('g').attr('class', 'eixo').selectAll('text').data([0, 0.5, 0.8, 0.95, 1]).join('text').attr('x', m.l - 6).attr('y', (v) => y(v))
+      .attr('dy', '.32em').attr('text-anchor', 'end').text((v) => F.pct(v, 0));
+    svg.append('g').attr('class', 'eixo').selectAll('text').data([0, 0.25, 0.5, 0.75, 1]).join('text').attr('x', (v) => x(v)).attr('y', H - 10)
+      .attr('text-anchor', (v) => (v === 0 ? 'start' : v === 1 ? 'end' : 'middle')).text((v) => F.pct(v, 0) + ' dos clientes');
+    svg.append('path').datum(pts).attr('d', d3.area().x((d) => x(d.x)).y0(y(0)).y1((d) => y(d.y))).style('fill', 'rgba(242,107,29,.14)');
+    svg.append('path').datum(pts).attr('d', d3.line().x((d) => x(d.x)).y((d) => y(d.y))).style('fill', 'none').style('stroke', 'var(--nk-laranja)').style('stroke-width', 2.5);
+    const dc = NK.dica(el);
+    const ponto = svg.append('circle').attr('r', 4).style('fill', 'var(--nk-preto)').attr('visibility', 'hidden');
+    svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent')
+      .on('mousemove', (ev) => {
+        const [mx] = d3.pointer(ev);
+        const i = Math.min(res.n - 1, Math.max(0, Math.round(x.invert(mx) * res.n) - 1)), r = res.lista[i];
+        ponto.attr('cx', x((i + 1) / res.n)).attr('cy', y(r.acum)).attr('visibility', 'visible');
+        dc.mostra(ev, `${r.pos}º ${r.cliente}`, [`Curva ${r.abc} · ${F.brl(r.receita)}`, `Acumulado: ${F.pct(r.acum)} do faturado`, `${F.pct((i + 1) / res.n)} dos clientes`]);
+      })
+      .on('mouseleave', () => { dc.esconde(); ponto.attr('visibility', 'hidden'); });
+  });
+
+  dash.draw('t-abc', (tb) => {
+    const { n, p } = dados();
+    if (NK.falha(tb, [n, p], true)) return;
+    const res = NK.abc(n.data, NK.per(p.data), NK.filtro().vendedor);
+    const q = NK.busca['t-abc'], cl = NK.fabc;
+    const rows = res.lista.filter((r) => (!cl || r.abc === cl) && (!q || r.cliente.includes(q)));
+    const lim = NK.lim['t-abc'];
+    tb.replaceChildren();
+    const cols = [
+      { fn: (r) => F.int(r.pos) }, { cls: 'txt', fn: (r) => r.cliente }, { fn: (r) => NK.pill(r.abc) }, { cls: 'forte', fn: (r) => F.brl(r.receita) },
+      { fn: (r) => F.pct(r.pct, 2) }, { fn: (r) => F.pct(r.acum) }, { fn: (r) => F.int(r.pedidos) }, { cls: 'esconde-estreito', fn: (r) => F.brl(r.ticket) },
+      { cls: 'txt esconde-estreito', fn: (r) => r.vendedor },
+    ];
+    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols);
+    document.querySelectorAll('#abc-mais').forEach((b) => { b.hidden = rows.length <= lim; });
+  });
+})();
+</script>
+
+<script>
+// ===================== CARTEIRA =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+
+  dash.draw('sit', (el) => {
+    const d = dash.data('c_situacao');
+    const { vendedor } = NK.filtro();
+    el.setAttribute('data-where', NK.w([['vendedor', vendedor], ['situacao', el.dataset.sit]]));
+    const r = d.status === 'ok' ? d.data.find((x) => x.vendedor === vendedor && x.situacao === el.dataset.sit) : null;
+    el.textContent = !r ? (d.status === 'ok' ? '0' : '—') : el.dataset.field === 'clientes' ? F.int(r.clientes) : F.brlK(r[el.dataset.field]);
+  });
+
+  const filtrados = (d) => {
+    const { vendedor } = NK.filtro(), q = NK.busca['t-carteira'], s = NK.fsit, c = NK.cabc;
+    return d.data.filter((r) => (vendedor === 'Todos' || r.vendedor === vendedor) && (!s || r.situacao === s) && (!c || r.abc === c) && (!q || r.cliente.includes(q)));
+  };
+
+  dash.draw('cart-cont', (el) => {
+    const d = dash.data('c_clientes');
+    el.textContent = d.status === 'ok' ? F.int(filtrados(d).length) + ' clientes na lista' : '—';
+  });
+
+  dash.draw('t-carteira', (tb) => {
+    const d = dash.data('c_clientes');
+    if (NK.falha(tb, [d], true)) return;
+    const rows = NK.ordena(filtrados(d), NK.sort['t-carteira']);
+    const lim = NK.lim['t-carteira'];
+    tb.replaceChildren();
+    const cols = [
+      { cls: 'txt', fn: (r) => r.cliente }, { cls: 'txt esconde-estreito', fn: (r) => r.vendedor }, { fn: (r) => NK.pill(r.abc) },
+      { cls: 'forte', fn: (r) => F.brl(r.receita) }, { fn: (r) => F.int(r.pedidos) }, { cls: 'esconde-estreito', fn: (r) => F.brl(r.ticket) },
+      { fn: (r) => F.data(r.ultima) }, { fn: (r) => (r.dias == null ? '—' : F.int(r.dias)) },
+      { cls: 'esconde-estreito', fn: (r) => (r.ciclo_medio == null ? '—' : F.dias(r.ciclo_medio)) },
+      { cls: 'txt', fn: (r) => NK.sit(r.situacao) }, { cls: 'esconde-estreito', fn: (r) => (r.aberto_valor ? F.brl(r.aberto_valor) : '—') },
+    ];
+    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols, NK.chave(r.cliente));
+    document.querySelectorAll('#cart-mais').forEach((b) => { b.hidden = rows.length <= lim; });
+  });
+
+  dash.draw('g-ciclo', (el) => {
+    const d = dash.data('ciclo_crm');
+    if (NK.falha(el, [d])) return;
+    const rows = [...d.data].sort((a, b) => Number(a.ordem) - Number(b.ordem));
+    const cores = ['var(--nk-ok)', 'var(--nk-atencao)', 'var(--nk-risco)', 'var(--nk-critico)', 'var(--nk-inativo)', '#450a0a'];
+    NK.barrasH(el, rows, { rot: (r) => r.etapa, sub: (r) => r.faixa, val: (r) => Number(r.negocios), cor: (r, i) => cores[i] || 'var(--nk-grafite)',
+      txt: (r) => F.int(Number(r.negocios)), dica: (r) => [r.faixa, F.int(Number(r.negocios)) + ' negócios'], aria: 'Negócios por etapa do funil Ciclo de Compra' });
+  });
+})();
+</script>
+
+<script>
+// ===================== FUNIL =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+
+  NK.barrasH = (el, rows, o) => {
+    el.replaceChildren();
+    const W = Math.max(260, el.clientWidth || 500), linha = o.sub ? 40 : 32, H = rows.length * linha + 6;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.aria);
+    const lw = Math.min(W * 0.42, Math.max(NK.medeTexto(svg, rows.map(o.rot), 'rot'), o.sub ? NK.medeTexto(svg, rows.map(o.sub)) : 0) + 14);
+    const tw = NK.medeTexto(svg, rows.map(o.txt), 'rot') + 10;
+    const x = d3.scaleLinear([0, d3.max(rows, o.val) || 1], [lw, W - tw]);
+    const dc = NK.dica(el);
+    const g = svg.selectAll('g').data(rows).join('g').attr('transform', (r, i) => `translate(0,${i * linha + 4})`);
+    g.append('text').attr('class', 'rot').attr('x', 0).attr('y', o.sub ? 12 : 15).text(o.rot);
+    if (o.sub) g.append('text').attr('x', 0).attr('y', 28).style('fill', 'var(--nk-texto-3)').style('font-size', '11px').text(o.sub);
+    g.append('rect').attr('x', lw).attr('y', 4).attr('height', linha - 14).attr('rx', 4).attr('width', W - tw - lw).style('fill', '#f1f1f3');
+    g.append('rect').attr('x', lw).attr('y', 4).attr('height', linha - 14).attr('rx', 4).attr('width', (r) => Math.max(2, x(o.val(r)) - lw)).style('fill', o.cor);
+    g.append('text').attr('class', 'rot').attr('x', (r) => x(o.val(r)) + 6).attr('y', (linha - 14) / 2 + 4).attr('dy', '.35em').text(o.txt);
+    g.append('rect').attr('width', W).attr('height', linha).style('fill', 'transparent')
+      .on('mousemove', (ev, r) => dc.mostra(ev, o.rot(r), o.dica(r))).on('mouseleave', () => dc.esconde());
+  };
+
+  dash.draw('g-etapas', (el) => {
+    const d = dash.data('c_etapas');
+    if (NK.falha(el, [d])) return;
+    const { vendedor } = NK.filtro();
+    const rows = d.data.filter((r) => r.vendedor === vendedor).sort((a, b) => a.ordem - b.ordem);
+    NK.barrasH(el, rows, { rot: (r) => r.etapa, sub: (r) => F.brlK(r.valor), val: (r) => r.negocios,
+      cor: (r) => (r.etapa === 'Faturado' ? 'var(--nk-laranja)' : 'var(--nk-grafite)'), txt: (r) => F.int(r.negocios),
+      dica: (r) => [F.int(r.negocios) + ' negócios', F.brl(r.valor)], aria: 'Negócios em cada etapa do funil de vendas' });
+  });
+
+  dash.draw('g-aging', (el) => {
+    const d = dash.data('c_aging');
+    if (NK.falha(el, [d])) return;
+    const { vendedor } = NK.filtro();
+    const rows = d.data.filter((r) => r.vendedor === vendedor).sort((a, b) => a.ordem - b.ordem);
+    const cores = ['var(--nk-ok)', 'var(--nk-atencao)', 'var(--nk-risco)', 'var(--nk-critico)', 'var(--nk-inativo)'];
+    NK.barrasH(el, rows, { rot: (r) => r.faixa, sub: (r) => F.brlK(r.valor), val: (r) => r.negocios, cor: (r) => cores[r.ordem],
+      txt: (r) => F.int(r.negocios), dica: (r) => [F.int(r.negocios) + ' orçamentos', F.brl(r.valor)], aria: 'Orçamentos em aberto por tempo parado' });
+  });
+
+  dash.draw('g-mensal', (el) => {
+    const d = dash.data('c_mensal');
+    if (NK.falha(el, [d])) return;
+    const { vendedor } = NK.filtro(), med = NK.med['g-mensal'];
+    const rows = d.data.filter((r) => r.vendedor === vendedor);
+    const a = (r) => (med === 'valor' ? r.fat_valor : r.fat_n), b = (r) => (med === 'valor' ? r.aberto_valor : r.aberto_n);
+    const fmt = med === 'valor' ? (v) => 'R$ ' + F.curto(v) : (v) => F.int(v);
+    el.replaceChildren();
+    const W = Math.max(280, el.clientWidth || 600), H = 280;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Faturado e em aberto por mês');
+    const y = d3.scaleLinear([0, d3.max(rows, (r) => Math.max(a(r), b(r))) || 1], [H - 28, 22]).nice();
+    const ticks = y.ticks(5);
+    const ml = Math.ceil(NK.medeTexto(svg, ticks.map(fmt))) + 12;
+    const x = d3.scaleBand(rows.map((r) => r.mes), [ml, W - 4]).padding(0.25);
+    const x2 = d3.scaleBand(['f', 'a'], [0, x.bandwidth()]).padding(0.08);
+    svg.append('g').attr('class', 'eixo').selectAll('line').data(ticks).join('line').attr('x1', ml).attr('x2', W - 4).attr('y1', (t) => y(t)).attr('y2', (t) => y(t));
+    svg.append('g').attr('class', 'eixo').selectAll('text').data(ticks).join('text').attr('x', ml - 8).attr('y', (t) => y(t)).attr('dy', '.32em').attr('text-anchor', 'end').text(fmt);
+    svg.append('g').attr('class', 'eixo').selectAll('text').data(rows).join('text').attr('x', (r) => x(r.mes) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').text((r) => F.mes(r.mes));
+    const dc = NK.dica(el);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(${x(r.mes)},0)`);
+    g.append('rect').attr('x', x2('f')).attr('width', x2.bandwidth()).attr('y', (r) => y(a(r))).attr('height', (r) => y(0) - y(a(r))).attr('rx', 3).style('fill', 'var(--nk-laranja)');
+    g.append('rect').attr('x', x2('a')).attr('width', x2.bandwidth()).attr('y', (r) => y(b(r))).attr('height', (r) => y(0) - y(b(r))).attr('rx', 3).style('fill', 'var(--nk-grafite)');
+    if (x2.bandwidth() > 34) {
+      g.append('text').attr('class', 'rot').attr('x', x2('f') + x2.bandwidth() / 2).attr('y', (r) => y(a(r)) - 6).attr('text-anchor', 'middle').style('font-size', '11px').text((r) => (a(r) ? F.curto(a(r)) : ''));
+      g.append('text').attr('class', 'rot').attr('x', x2('a') + x2.bandwidth() / 2).attr('y', (r) => y(b(r)) - 6).attr('text-anchor', 'middle').style('font-size', '11px').text((r) => (b(r) ? F.curto(b(r)) : ''));
+    }
+    g.append('rect').attr('width', x.bandwidth()).attr('height', H - 28).style('fill', 'transparent')
+      .on('mousemove', (ev, r) => dc.mostra(ev, F.mesLongo(r.mes), [
+        { cor: 'var(--nk-laranja)', txt: `Faturado: ${F.brl(r.fat_valor)} · ${F.int(r.fat_n)} negócios` },
+        { cor: 'var(--nk-grafite)', txt: `Em aberto: ${F.brl(r.aberto_valor)} · ${F.int(r.aberto_n)} negócios` },
+      ]))
+      .on('mouseleave', () => dc.esconde());
+  });
+})();
+</script>
+
+
+<script>
+// ===================== PRODUTOS =====================
+(function () {
+  const NK = window.NK, F = NK.f;
+  NK.lim['t-produtos'] = 50; NK.busca['t-produtos'] = ''; NK.pabc = '';
+  let memo = { k: null };
+  NK.produtos = function () {
+    const n = dash.data('negocios'), it = dash.data('itens'), p = dash.data('c_periodos');
+    if (n.status !== 'ok' || it.status !== 'ok' || p.status !== 'ok' || !p.data.length) return null;
+    const per = NK.per(p.data), { vendedor } = NK.filtro();
+    const k = [per.ini, per.fim, vendedor, n.data.length, it.data.length].join('|');
+    if (memo.k === k && memo.src === it.data) return memo.v;
+    const neg = new Map();
+    for (const r of n.data) if (r.etapa === 'Faturado' && r.status !== 'lost' && r.data >= per.ini && r.data <= per.fim && (vendedor === 'Todos' || r.vendedor === vendedor)) neg.set(r.negocio, r);
+    const por = new Map();
+    for (const i of it.data) {
+      const r = neg.get(i.negocio); if (!r) continue;
+      const chave = i.sku || i.produto;
+      const o = por.get(chave) || { sku: i.sku, produto: i.produto, total: 0, qtd: 0, negocios: new Set(), clientes: new Set() };
+      o.total += Number(i.total) || 0; o.qtd += Number(i.qtd) || 0; o.negocios.add(i.negocio); o.clientes.add(r.cliente);
+      por.set(chave, o);
+    }
+    const ord = [...por.values()].sort((a, b) => b.total - a.total);
+    const total = ord.reduce((s, o) => s + o.total, 0) || 1;
+    const tot = { A: { n: 0, total: 0 }, B: { n: 0, total: 0 }, C: { n: 0, total: 0 } };
+    let acum = 0;
+    const lista = ord.map((o, i) => {
+      const antes = acum / total; acum += o.total;
+      const abc = antes < 0.8 ? 'A' : antes < 0.95 ? 'B' : 'C';
+      tot[abc].n += 1; tot[abc].total += o.total;
+      return { pos: i + 1, sku: o.sku, produto: o.produto, abc, total: o.total, qtd: o.qtd, negocios: o.negocios.size, clientes: o.clientes.size,
+        preco: o.qtd ? o.total / o.qtd : null, ticket: o.negocios.size ? o.total / o.negocios.size : null, acum: acum / total };
+    });
+    memo = { k, src: it.data, v: { lista, tot, total: ord.reduce((s, o) => s + o.total, 0), n: lista.length } };
+    return memo.v;
+  };
+  const nomeProduto = (r) => {
+    const f = document.createDocumentFragment();
+    const a = document.createElement('div'); a.textContent = r.produto; f.appendChild(a);
+    if (r.sku) { const b = document.createElement('div'); b.className = 'nk-cont'; b.textContent = 'SKU ' + r.sku; f.appendChild(b); }
+    return f;
+  };
+
+  dash.draw('t-prod-top', (tb) => {
+    const res = NK.produtos();
+    tb.replaceChildren();
+    if (!res) return;
+    if (!res.n) { NK.linhaTabela(tb, {}, [{ cls: 'txt', fn: () => 'Nenhum item de pedido faturado neste período.' }]); return; }
+    const cols = [{ cls: 'txt', fn: nomeProduto }, { fn: (r) => F.int(r.negocios) }, { fn: (r) => F.int(r.qtd) }, { fn: (r) => F.brlK(r.ticket) }, { cls: 'verde', fn: (r) => F.brlK(r.total) }];
+    for (const r of res.lista.slice(0, 10)) NK.linhaTabela(tb, r, cols);
+  });
+
+  dash.draw('prod-card', (el) => {
+    const res = NK.produtos();
+    if (!res) { el.textContent = '—'; return; }
+    const t = res.tot[el.dataset.classe], c = el.dataset.campo;
+    el.textContent = c === 'total' ? F.brlK(t.total) : c === 'n' ? F.int(t.n) : c === 'pct_n' ? F.pct(res.n ? t.n / res.n : null) : F.pct(res.total ? t.total / res.total : null);
+  });
+
+  dash.draw('prod-cont', (el) => { const res = NK.produtos(); el.textContent = res ? F.int(res.n) + ' produtos vendidos' : '—'; });
+
+  dash.draw('t-produtos', (tb) => {
+    const res = NK.produtos();
+    tb.replaceChildren();
+    if (!res) return;
+    const q = NK.busca['t-produtos'], cl = NK.pabc, lim = NK.lim['t-produtos'];
+    const rows = res.lista.filter((r) => (!cl || r.abc === cl) && (!q || String(r.produto).toUpperCase().includes(q) || String(r.sku).toUpperCase().includes(q)));
+    const cols = [{ fn: (r) => F.int(r.pos) }, { cls: 'txt', fn: nomeProduto }, { fn: (r) => NK.pill(r.abc) }, { fn: (r) => F.int(r.negocios) }, { fn: (r) => F.int(r.clientes) },
+      { fn: (r) => F.int(r.qtd) }, { cls: 'esconde-estreito', fn: (r) => F.brl(r.preco) }, { cls: 'forte', fn: (r) => F.brl(r.total) }, { fn: (r) => F.pct(r.acum) }];
+    for (const r of rows.slice(0, lim)) NK.linhaTabela(tb, r, cols);
+    document.querySelectorAll('#prod-mais').forEach((b) => { b.hidden = rows.length <= lim; });
+  });
+
+  document.querySelectorAll('#prod-busca').forEach((i) => i.addEventListener('input', () => { NK.busca['t-produtos'] = i.value.trim().toUpperCase(); NK.lim['t-produtos'] = 50; dash.draw('t-produtos'); }));
+  document.querySelectorAll('[data-pabc]').forEach((b) => b.addEventListener('click', () => {
+    b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    NK.pabc = b.dataset.pabc; NK.lim['t-produtos'] = 50; dash.draw('t-produtos');
+  }));
+})();
+</script>
+
+</div>
+</body>
+</html>

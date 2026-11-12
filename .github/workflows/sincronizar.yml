@@ -1,0 +1,17 @@
+# Sincronização incremental de hora em hora (o plano grátis da Vercel só roda cron 1x por dia).
+# Precisa de dois "secrets" no repositório: PAINEL_URL (ex.: https://painel-nak.vercel.app) e CRON_SECRET (o mesmo da Vercel).
+name: Sincronizar painel
+on:
+  schedule:
+    - cron: '7 10-23 * * 1-6'   # de hora em hora, 7h às 20h de Brasília, seg a sáb
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chamar a sincronização
+        run: |
+          curl -sS --fail-with-body --max-time 320 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.PAINEL_URL }}/api/sync?tipo=incremental"

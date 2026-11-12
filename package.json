@@ -1,0 +1,20 @@
+{
+  "name": "painel-nak",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Painel Comercial NAK: dashboard ligado à API do CRM DataCrazy, com banco Postgres e sincronização automática.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.0.2",
+    "@vercel/functions": "3.11.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.15"
+  }
+}
