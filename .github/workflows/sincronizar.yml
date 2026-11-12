@@ -1,17 +1,31 @@
-# Sincronização incremental de hora em hora (o plano grátis da Vercel só roda cron 1x por dia).
+# Sincronização com o CRM.
+# - Automática: incremental de hora em hora (o plano grátis da Vercel só roda cron 1x por dia; a completa diária vem da Vercel Cron).
+# - Manual: aba Actions → "Sincronizar painel" → Run workflow (padrão: completa).
 # Precisa de dois "secrets" no repositório: PAINEL_URL (ex.: https://painel-nak.vercel.app) e CRON_SECRET (o mesmo da Vercel).
 name: Sincronizar painel
 on:
   schedule:
     - cron: '7 10-23 * * 1-6'   # de hora em hora, 7h às 20h de Brasília, seg a sáb
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: 'Tipo de sincronização'
+        type: choice
+        options: [completa, incremental]
+        default: completa
 jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Chamar a sincronização
+        env:
+          TIPO: ${{ inputs.tipo || 'incremental' }}
+          PAINEL_URL: ${{ secrets.PAINEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          if [ -z "$PAINEL_URL" ] || [ -z "$CRON_SECRET" ]; then echo "Faltam os secrets PAINEL_URL e/ou CRON_SECRET"; exit 1; fi
           curl -sS --fail-with-body --max-time 320 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.PAINEL_URL }}/api/sync?tipo=incremental"
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${PAINEL_URL%/}/api/sync?tipo=$TIPO"
+          echo
