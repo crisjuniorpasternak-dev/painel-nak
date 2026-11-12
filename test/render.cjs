@@ -12,31 +12,34 @@ const srv = http.createServer((req, res) => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: +(process.argv[2] || 1400), height: 1000 } });
   const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   const out = process.argv[3] || '/tmp';
+  const aba = async (t) => { if (p.viewportSize().width <= 900) { await p.click('#menu-botao'); await p.waitForTimeout(300); } await p.click('#aba-' + t); await p.waitForTimeout(250); };
   await p.goto('http://localhost:5077/'); await p.waitForTimeout(1500);
   await p.screenshot({ path: out + '/v_geral.png', fullPage: true });
-  for (const t of ['produtos', 'vendedores', 'carteira']) { await p.click('#aba-' + t); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_' + t + '.png', fullPage: true }); }
+  for (const t of ['produtos', 'vendedores', 'carteira']) { await aba(t); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_' + t + '.png', fullPage: true }); }
   await p.selectOption('#f-periodo', '30d'); await p.waitForTimeout(300);
-  await p.click('#aba-produtos'); await p.waitForTimeout(300); await p.screenshot({ path: out + '/v_produtos30.png', fullPage: true });
+  await aba('produtos'); await p.waitForTimeout(300); await p.screenshot({ path: out + '/v_produtos30.png', fullPage: true });
   await p.click('#t-produtos tr[data-produto]'); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_det_produto.png' });
   await p.click('#detalhe tr[data-cliente]'); await p.waitForTimeout(400); await p.screenshot({ path: out + '/v_det_cliente.png' });
   console.log('voltar visível:', await p.isVisible('#det-voltar'));
   await p.click('#det-voltar'); await p.waitForTimeout(200); console.log('tipo após voltar:', await p.textContent('.nk-det-tipo'));
   await p.keyboard.press('Escape'); console.log('fechou:', await p.isHidden('#detalhe'));
   // ordenação pelo cabeçalho
-  await p.click('#aba-produtos'); await p.waitForTimeout(300);
+  await aba('produtos'); await p.waitForTimeout(300);
   const col = async (sel, i) => p.$$eval(sel + ' tbody tr', (trs, i) => trs.slice(0, 5).map((t) => t.children[i].textContent), i);
   await p.click('#t-produtos thead th:nth-child(6)'); console.log('qtd desc:', await col('#t-produtos', 5));
   await p.click('#t-produtos thead th:nth-child(6)'); console.log('qtd asc:', await col('#t-produtos', 5), await p.getAttribute('#t-produtos thead th:nth-child(6)', 'aria-sort'));
   await p.click('#t-produtos thead th:nth-child(2)'); console.log('nome asc:', await col('#t-produtos', 1));
   await p.screenshot({ path: out + '/v_ord.png' });
-  await p.click('#aba-carteira'); await p.waitForTimeout(300);
+  await aba('carteira'); await p.waitForTimeout(300);
   await p.click('#t-carteira thead th:nth-child(8)'); console.log('dias desc:', await col('#t-carteira', 7));
-  await p.click('#aba-vendedores'); await p.waitForTimeout(300);
+  await aba('vendedores'); await p.waitForTimeout(300);
   await p.click('#t-calor thead th:nth-child(3)'); console.log('calor:', await col('#t-calor', 2));
-  await p.click('#aba-abc'); await p.waitForTimeout(300);
+  await aba('abc'); await p.waitForTimeout(300);
   await p.click('#t-abc tbody tr'); await p.waitForTimeout(300);
   await p.click('#detalhe table[data-ord="det-cli-neg"] thead th:nth-child(7)'); console.log('det valor desc:', await col('#detalhe table[data-ord="det-cli-neg"]', 6));
   await p.keyboard.press('Escape');
+  await aba('geral'); await p.waitForTimeout(300);
+  await p.click('#menu-botao'); await p.waitForTimeout(600); await p.screenshot({ path: out + '/v_menu_toggle.png' });
   console.log('erros:', JSON.stringify(errs));
   await b.close(); srv.close();
 });
