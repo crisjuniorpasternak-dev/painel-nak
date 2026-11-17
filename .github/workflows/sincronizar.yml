@@ -1,7 +1,9 @@
-# Sincronização com o CRM.
+# Sincronização com o CRM (e com a Omie, no painel paralelo).
 # - Automática: incremental de hora em hora (o plano grátis da Vercel só roda cron 1x por dia; a completa diária vem da Vercel Cron).
 # - Manual: aba Actions → "Sincronizar painel" → Run workflow (padrão: completa).
-# Precisa de dois "secrets" no repositório: PAINEL_URL (ex.: https://painel-nak.vercel.app) e CRON_SECRET (o mesmo da Vercel).
+# Secrets do repositório:
+#   PAINEL_URL e CRON_SECRET          painel principal (CRM)
+#   PAINEL_OMIE_URL e CRON_SECRET_OMIE painel paralelo com a Omie (opcional; sem eles o passo é pulado)
 name: Sincronizar painel
 on:
   schedule:
@@ -29,3 +31,21 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" \
             "${PAINEL_URL%/}/api/sync?tipo=$TIPO"
           echo
+  sync-omie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Painel paralelo (CRM e Omie)
+        env:
+          TIPO: ${{ inputs.tipo || 'incremental' }}
+          URL: ${{ secrets.PAINEL_OMIE_URL }}
+          SEGREDO: ${{ secrets.CRON_SECRET_OMIE }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SEGREDO" ]; then echo "Painel paralelo não configurado (PAINEL_OMIE_URL/CRON_SECRET_OMIE); pulando."; exit 0; fi
+          chama() { curl -sS --fail-with-body --max-time 320 -H "Authorization: Bearer $SEGREDO" "${URL%/}/api/sync?$1"; }
+          chama "tipo=$TIPO"; echo
+          # A carga completa da Omie pode precisar de mais de uma chamada: repete enquanto voltar "parcial":true.
+          for i in $(seq 1 8); do
+            R=$(chama "tipo=$TIPO&fonte=omie"); echo "$R"
+            echo "$R" | grep -q '"parcial":true' || break
+          done

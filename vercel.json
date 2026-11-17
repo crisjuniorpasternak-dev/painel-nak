@@ -4,6 +4,10 @@
     {
       "path": "/api/sync?tipo=completa",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/sync?tipo=completa&fonte=omie",
+      "schedule": "45 8 * * *"
     }
   ],
   "functions": {
@@ -11,6 +15,9 @@
       "maxDuration": 300
     },
     "api/dados.js": {
+      "maxDuration": 30
+    },
+    "api/conferencia.js": {
       "maxDuration": 30
     }
   }

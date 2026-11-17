@@ -34,6 +34,23 @@ public/index.html  abas Visão geral, Vendedores, Curva ABC, Produtos, Carteira 
 
 Abra o endereço do painel e entre com o e-mail `admin` e a senha `PAINEL_SENHA`. Em **Acessos**, crie o seu acesso de administrador e os dos supervisores e vendedores.
 
+## Painel paralelo com a Omie (ERP)
+
+O mesmo código também lê a Omie direto da API dela, para conferir se os dados do CRM estão certos. Ele roda como **outro projeto na Vercel**, com banco próprio, então o painel principal não muda.
+
+- **Fonte dos dados**: um botão "Omie (ERP) | CRM" no topo troca todas as telas entre as duas fontes.
+- **Conferência** (administrador e supervisor): pedido a pedido, o número do pedido na Omie contra o nº do pedido gravado no negócio do CRM (externalId). Mostra o faturado de cada fonte por mês e marca cada pedido como Confere, Valor diferente, Etapa diferente, Só na Omie, Só no CRM, Repetido no CRM ou CRM sem nº do pedido.
+- A Omie fica em tabelas separadas (`omie_vendedores`, `omie_clientes`, `omie_pedidos`, `omie_pedido_itens`). Só chamadas de leitura (`ListarPedidos`, `ListarClientes`, `ConsultarCliente`, `ListarVendedores`).
+- A carga completa da Omie pode levar mais de uma chamada: quando o tempo da função acaba, ela guarda a página em `omie_estado` e a próxima chamada continua dali.
+
+Para montar o painel paralelo:
+
+1. **Vercel → Add New → Project**, importe este mesmo repositório com outro nome (ex.: `painel-nak-omie`). Em **Settings → Git → Production Branch**, escolha o branch do painel paralelo.
+2. **Storage → Create Database → Neon** (um banco novo, só dele).
+3. **Environment Variables**: as mesmas do painel principal (`DATACRAZY_TOKEN`, `PAINEL_SENHA`, `SESSAO_SEGREDO`, `CRON_SECRET`) mais `OMIE_APP_KEY`, `OMIE_APP_SECRET` e `PAINEL_FONTE=omie`.
+4. Primeira carga: `curl -H "Authorization: Bearer <CRON_SECRET>" "https://<painel-omie>.vercel.app/api/sync?tipo=completa"` (CRM) e, repetindo enquanto a resposta trouxer `"parcial":true`, `.../api/sync?tipo=completa&fonte=omie`.
+5. Para a incremental de hora em hora, crie os secrets `PAINEL_OMIE_URL` e `CRON_SECRET_OMIE` no GitHub.
+
 ## Acessos
 
 | Perfil | Vê | Pode |
@@ -52,5 +69,6 @@ Abra o endereço do painel e entre com o e-mail `admin` e a senha `PAINEL_SENHA`
 
 ```
 npm install
-npm test        # banco em memória (PGlite) + API DataCrazy simulada com dados anônimos
+npm test        # banco em memória (PGlite) + APIs do DataCrazy e da Omie simuladas, com dados anônimos
+node test/render_omie.cjs 1400 /tmp   # telas da fonte Omie e da Conferência (depois do npm test)
 ```
