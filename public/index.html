@@ -415,6 +415,7 @@ html, body { margin: 0; background: #f4f4f5; }
     <div class="nk-intervalo" id="f-intervalo">De <b data-draw="intervalo-ini">—</b> a <b data-draw="intervalo-fim">—</b></div>
   </div>
 
+  <p class="nk-aviso nk-aviso-carga" id="aviso-vazio" hidden>Ainda não há dados desta fonte. Um administrador pode abrir Conferência e clicar em Sincronizar agora.</p>
   <p class="nk-aviso nk-aviso-carga" id="aviso-carga" hidden>A primeira carga da Omie ainda está em andamento (ela é feita em partes). Os números da Omie podem estar incompletos até ela terminar.</p>
 
   <!-- ===================== VISÃO GERAL ===================== -->
@@ -669,6 +670,16 @@ html, body { margin: 0; background: #f4f4f5; }
 
   <!-- ===================== CONFERÊNCIA CRM × OMIE ===================== -->
   <section class="nk-pagina" id="conferencia" role="tabpanel" aria-labelledby="aba-conferencia" hidden>
+    <div class="nk-card" id="card-sinc">
+      <div class="nk-card-cab">
+        <div><h3>Sincronização</h3><p class="nk-card-sub">O painel lê o CRM e a Omie sozinho (completa de madrugada, incremental de hora em hora). Use o botão para atualizar agora.</p></div>
+        <button type="button" class="nk-bt" id="sinc-agora" hidden>Sincronizar agora</button>
+      </div>
+      <p class="nk-msg" id="sinc-msg" role="status"></p>
+      <div class="nk-tab-wrap" style="max-height:260px">
+        <table id="t-sinc"><thead><tr><th class="txt">Fonte</th><th class="txt">Tipo</th><th>Início</th><th>Duração</th><th>Registros</th><th class="txt">Resultado</th></tr></thead><tbody data-draw="t-sinc"></tbody></table>
+      </div>
+    </div>
     <div class="nk-kpis">
       <div class="nk-kpi destaque"><div class="nk-kpi-rot">Faturado na Omie</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="omie">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="omie_n"></div></div>
       <div class="nk-kpi"><div class="nk-kpi-rot">Faturado no CRM</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="crm">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="crm_n"></div></div>
@@ -2195,6 +2206,9 @@ window.NK = (function () {
     $('topo-sub').textContent = omie ? 'Desempenho de vendas da NAK direto da Omie (ERP)' : 'Desempenho de vendas da NAK a partir do CRM DataCrazy';
     $('topo-atual').textContent = omie ? 'Sincroniza com a Omie de hora em hora' : 'Sincroniza com o CRM de hora em hora';
     $('aviso-carga').hidden = !(omie && meta.carga_incompleta);
+    const neg = dash.data('negocios');
+    $('aviso-vazio').hidden = !(neg.status === 'ok' && !neg.data.length);
+    $('sinc-agora').hidden = !(eu && eu.perfil === 'admin');
     document.querySelectorAll('[data-fonte-txt]').forEach((n) => { n.hidden = !temOmie; });
     const gestor = eu && (eu.perfil === 'admin' || eu.perfil === 'supervisor');
     $('aba-conferencia').hidden = !(temOmie && gestor);
@@ -2234,7 +2248,47 @@ window.NK = (function () {
     } catch (e) { console.error('[conferencia]', e); conf = { status: 'error', data: null, message: String(e.message || e) }; }
     redesenha();
   }
-  const redesenha = () => ['conf-kpi', 'conf-sit', 'conf-cont', 't-conf', 't-conf-mes'].forEach((n) => dash.draw(n));
+  // ---- sincronização manual (só administrador)
+  const quando = (s) => (s ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+  dash.draw('t-sinc', (tb) => {
+    if (conf.status !== 'ok') return vazio(tb, msgEstado());
+    const L = conf.data.sincronizacoes || [];
+    if (!L.length) return vazio(tb, 'Nenhuma sincronização ainda.');
+    tb.replaceChildren();
+    const cols = [
+      { cls: 'txt', fn: (r) => (r.tipo.startsWith('omie-') ? 'Omie' : 'CRM') }, { cls: 'txt', fn: (r) => r.tipo.replace('omie-', '') },
+      { fn: (r) => quando(r.inicio) }, { fn: (r) => (r.fim ? Math.max(1, Math.round((Date.parse(r.fim) - Date.parse(r.inicio)) / 1000)) + ' s' : 'rodando') },
+      { fn: (r) => F.int((r.negocios || 0)) + (r.tipo.startsWith('omie-') ? ' pedidos' : ' negócios') },
+      { cls: 'txt', fn: (r, td) => { if (r.ok === false) td.classList.add('neg'); return r.ok === false ? 'Erro: ' + (r.erro || '') : r.ok ? (r.erro ? 'Ok (' + r.erro + ')' : 'Ok') : '—'; } },
+    ];
+    for (const r of L) NK.linhaTabela(tb, r, cols);
+  });
+  async function post(fonte) {
+    const r = await fetch('/api/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fonte }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error((fonte === 'omie' ? 'Omie: ' : 'CRM: ') + (j.erro || 'erro ' + r.status));
+    return j;
+  }
+  $('sinc-agora').addEventListener('click', async () => {
+    const bt = $('sinc-agora'), m = $('sinc-msg');
+    bt.disabled = true; m.className = 'nk-msg';
+    try {
+      m.textContent = 'Lendo o CRM… (a primeira vez leva uns 3 minutos)';
+      const c = await post('crm');
+      let o, parte = 0;
+      do {
+        parte++;
+        m.textContent = `CRM ok (${F.int(c.negocios)} negócios). Lendo a Omie… parte ${parte}` + (o ? ` (${F.int(o.pedidos)} pedidos nesta parte)` : '');
+        o = await post('omie');
+      } while (o.parcial && parte < 30);
+      m.textContent = o.parcial ? 'A carga da Omie ainda não terminou; clique de novo para continuar.' : 'Pronto. CRM e Omie atualizados.';
+      m.className = 'nk-msg ' + (o.parcial ? '' : 'ok');
+      dash.refresh();
+    } catch (e) { m.textContent = e.message; m.className = 'nk-msg erro'; }
+    finally { bt.disabled = false; carregaConf(true); }
+  });
+
+  const redesenha = () => ['t-sinc', 'conf-kpi', 'conf-sit', 'conf-cont', 't-conf', 't-conf-mes'].forEach((n) => dash.draw(n));
   addEventListener('nk:pagina', (ev) => { if (ev.detail === 'conferencia') carregaConf(); });
 
   // Linhas do período e vendedor escolhidos.

@@ -12,6 +12,12 @@ const srv = http.createServer((req, res) => {
     const d = omie ? { ...ler('saida_omie.json'), carga_incompleta: false } : { fonte: 'crm', ...ler('saida_dados.json') };
     return res.end(JSON.stringify({ ...d, fontes: { crm: true, omie: true }, usuario }));
   }
+  if (u.pathname === '/api/sync' && req.method === 'POST') {
+    let b = ''; req.on('data', (c) => (b += c)); return req.on('end', () => {
+      const f = JSON.parse(b).fonte; srv.n = (srv.n || 0) + 1;
+      setTimeout(() => res.end(JSON.stringify(f === 'crm' ? { ok: true, negocios: 5205 } : { ok: true, pedidos: 100, parcial: srv.n < 4 })), 100);
+    });
+  }
   if (u.pathname === '/api/conferencia') return res.end(fs.readFileSync(path.join(__dirname, 'saida_conferencia.json')));
   if (u.pathname === '/api/usuarios') return res.end('[]');
   const f = path.join(pub, u.pathname === '/' ? 'index.html' : u.pathname);
@@ -38,6 +44,9 @@ const srv = http.createServer((req, res) => {
   console.log('busca 777777:', await p.$$eval('#t-conf tbody tr', (e) => e.map((x) => x.textContent)));
   await p.fill('#conf-busca', '');
   await p.click('#t-conf thead th:nth-child(7)'); await p.waitForTimeout(200);
+  await p.click('#sinc-agora'); await p.waitForTimeout(1500);
+  console.log('sinc:', await p.textContent('#sinc-msg'), 'chamadas:', srv.n);
+  await p.screenshot({ path: out + '/o_sinc.png' });
   await p.click('[data-fonte="crm"]'); await p.waitForTimeout(1200);
   console.log('após trocar para CRM:', await p.textContent('#topo-sub'), new URL(p.url()).search);
   await aba('geral'); await p.screenshot({ path: out + '/o_crm_geral.png' });
