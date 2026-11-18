@@ -60,9 +60,11 @@ function omieFetch(dados, crmFetch, chamadas) {
       return Response.json({ pagina: n, total_de_paginas: tot, registros: Math.min(tam, lista.length - (n - 1) * tam), total_de_registros: lista.length, [chave]: lista.slice((n - 1) * tam, n * tam) });
     };
     if (b.call === 'ListarVendedores') return pag(dados.vend, 'cadastro');
-    if (b.call === 'ListarClientes') return pag(dados.cli.slice(5), 'clientes_cadastro'); // os 5 primeiros vêm pelo ConsultarCliente
+    if (b.call === 'ListarClientes') return pag(p.filtrar_por_data_de ? [] : dados.cli.slice(5), 'clientes_cadastro'); // os 5 primeiros vêm pelo ConsultarCliente
     if (b.call === 'ConsultarCliente') { const c = dados.cli.find((x) => x.codigo_cliente_omie === p.codigo_cliente_omie); return c ? Response.json(c) : Response.json({ faultstring: 'ERROR: Cliente não cadastrado', faultcode: 'SOAP-ENV:Client-103' }, { status: 500 }); }
-    if (b.call === 'ListarPedidos') return pag(dados.pedidos, 'pedido_venda_produto');
+    const ord = (br) => br.split('/').reverse().join('');
+    const desde = (l, campo) => (p.filtrar_por_data_de ? l.filter((x) => ord(campo(x) || '00/00/0000') >= ord(p.filtrar_por_data_de)) : l);
+    if (b.call === 'ListarPedidos') return pag(desde(dados.pedidos, (x) => x.infoCadastro.dAlt), 'pedido_venda_produto');
     return Response.json({ faultstring: 'método desconhecido' }, { status: 500 });
   };
 }
@@ -87,11 +89,14 @@ test('carga completa da Omie em partes, painel pela Omie e conferência com o CR
 
   // tempo zero: cada chamada faz uma página e para; repete até terminar
   let r, partes = 0;
-  do { r = await sincronizarOmie('completa', { tempoMs: 0, agora: new Date('2026-11-13T08:45:00Z') }); assert.equal(r.ok, true, r.erro); partes++; } while (r.parcial && partes < 400);
+  do {
+    r = await sincronizarOmie('completa', { tempoMs: 0, agora: new Date('2026-11-13T08:45:00Z') }); assert.equal(r.ok, true, r.erro); partes++;
+    if (partes === 3) assert.equal((await montarDadosOmie()).carga_incompleta, true, 'aviso aparece durante a primeira carga');
+  } while (r.parcial && partes < 400);
   assert.ok(partes > 3, 'precisou de várias partes');
   const [{ n }] = await q('SELECT count(*)::int AS n FROM omie_pedidos');
   assert.equal(n, dados.pedidos.length);
-  const [{ e }] = await q("SELECT count(*)::int AS e FROM omie_estado");
+  const [{ e }] = await q("SELECT count(*)::int AS e FROM omie_estado WHERE chave = 'completa'");
   assert.equal(e, 0, 'estado limpo ao terminar');
   const [{ semCli }] = await q('SELECT count(*)::int AS "semCli" FROM omie_pedidos p LEFT JOIN omie_clientes c ON c.codigo = p.codigo_cliente WHERE c.codigo IS NULL');
   assert.ok(semCli <= 1, 'clientes que faltavam vieram pelo ConsultarCliente (fica só o inexistente)');
@@ -135,6 +140,21 @@ test('carga completa da Omie em partes, painel pela Omie e conferência com o CR
   const rc = await sincronizarOmie('completa', { agora: new Date('2026-11-14T08:45:00Z') });
   assert.equal(rc.ok, true, rc.erro);
   assert.equal(rc.removidos, 1);
+  // Cron diária: a carga completa nova vai em partes, mas o painel não volta a avisar "primeira carga" e
+  // os pedidos alterados nos últimos dias entram já na primeira parte (incremental antes).
+  assert.equal((await montarDadosOmie()).carga_incompleta, false);
+  const alvo = dados.pedidos.find((p) => p.cabecalho.codigo_pedido === 900010);
+  alvo.total_pedido.valor_total_pedido = 12345.67; alvo.infoCadastro.dAlt = '14/11/2026';
+  const rp = await sincronizarOmie('completa', { tempoMs: 0, agora: new Date('2026-11-15T08:45:00Z') });
+  assert.equal(rp.ok, true, rp.erro);
+  assert.equal(rp.parcial, true);
+  const [{ total }] = await q('SELECT total::float8 AS total FROM omie_pedidos WHERE codigo_pedido = 900010');
+  assert.equal(total, 12345.67, 'alteração recente entrou pela incremental');
+  assert.equal((await montarDadosOmie()).carga_incompleta, false, 'carga completa diária em partes não reacende o aviso');
+  let k = 0, rr;
+  do { rr = await sincronizarOmie('incremental', { tempoMs: 0, agora: new Date('2026-11-15T09:00:00Z') }); k++; } while (rr.parcial && k < 400);
+  assert.equal(rr.ok, true, rr.erro);
+  assert.equal(rr.removidos, 0, 'nada some à toa quando a carga vai em partes');
   fs.writeFileSync(new URL('./saida_omie.json', import.meta.url), JSON.stringify(await montarDadosOmie()));
   fs.writeFileSync(new URL('./saida_conferencia.json', import.meta.url), JSON.stringify(await conferencia()));
   globalThis.fetch = crmFetch;
