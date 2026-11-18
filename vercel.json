@@ -6,7 +6,7 @@
       "schedule": "30 8 * * *"
     },
     {
-      "path": "/api/sync?tipo=completa&fonte=omie",
+      "path": "/api/sync?tipo=incremental&fonte=omie",
       "schedule": "45 8 * * *"
     }
   ],

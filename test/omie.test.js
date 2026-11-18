@@ -152,9 +152,17 @@ test('carga completa da Omie em partes, painel pela Omie e conferência com o CR
   assert.equal(total, 12345.67, 'alteração recente entrou pela incremental');
   assert.equal((await montarDadosOmie()).carga_incompleta, false, 'carga completa diária em partes não reacende o aviso');
   let k = 0, rr;
-  do { rr = await sincronizarOmie('incremental', { tempoMs: 0, agora: new Date('2026-11-15T09:00:00Z') }); k++; } while (rr.parcial && k < 400);
+  do { rr = await sincronizarOmie('completa', { tempoMs: 0, agora: new Date('2026-11-15T09:00:00Z') }); k++; } while (rr.parcial && k < 400);
   assert.equal(rr.ok, true, rr.erro);
   assert.equal(rr.removidos, 0, 'nada some à toa quando a carga vai em partes');
+  // Depois da primeira carga, a incremental (cron diária e botão) não recomeça nem continua releitura completa.
+  await sincronizarOmie('completa', { tempoMs: 0, agora: new Date('2026-11-16T08:45:00Z') });
+  const ri2 = await sincronizarOmie('incremental', { tempoMs: 0, agora: new Date('2026-11-16T09:00:00Z') });
+  assert.equal(ri2.ok, true, ri2.erro);
+  assert.equal(ri2.tipo, 'incremental');
+  assert.equal(ri2.parcial, false);
+  const [{ pend2 }] = await q("SELECT count(*)::int AS pend2 FROM omie_estado WHERE chave = 'completa'");
+  assert.equal(pend2, 0, 'releitura pendente descartada');
   fs.writeFileSync(new URL('./saida_omie.json', import.meta.url), JSON.stringify(await montarDadosOmie()));
   fs.writeFileSync(new URL('./saida_conferencia.json', import.meta.url), JSON.stringify(await conferencia()));
   globalThis.fetch = crmFetch;
