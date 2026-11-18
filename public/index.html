@@ -2204,7 +2204,7 @@ window.NK = (function () {
     $('filtro-fonte').hidden = !temOmie;
     document.querySelectorAll('[data-fonte]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fonte === meta.fonte)));
     $('topo-sub').textContent = omie ? 'Desempenho de vendas da NAK direto da Omie (ERP)' : 'Desempenho de vendas da NAK a partir do CRM DataCrazy';
-    $('topo-atual').textContent = omie ? 'Sincroniza com a Omie de hora em hora' : 'Sincroniza com o CRM de hora em hora';
+    $('topo-atual').textContent = omie ? 'Sincroniza com a Omie todo dia às 5h45' : 'Sincroniza com o CRM de hora em hora';
     $('aviso-carga').hidden = !(omie && meta.carga_incompleta);
     const neg = dash.data('negocios');
     $('aviso-vazio').hidden = !(neg.status === 'ok' && !neg.data.length);
