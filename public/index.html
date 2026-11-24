@@ -402,7 +402,7 @@ html, body { margin: 0; background: #f4f4f5; }
     <button type="button" class="nk-menu" id="menu-botao" aria-label="Recolher ou abrir o menu" aria-controls="lateral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
     <div class="nk-tit">
       <h1>Painel Comercial</h1>
-      <p class="nk-sub" id="topo-sub">Desempenho de vendas da NAK a partir do CRM DataCrazy</p>
+      <p class="nk-sub" id="topo-sub">Desempenho de Vendas NAK</p>
     </div>
     <div class="nk-atual" id="topo-atual">Sincroniza com o CRM de hora em hora</div>
   </header>
@@ -2203,7 +2203,7 @@ window.NK = (function () {
     const temOmie = !!(meta.fontes && meta.fontes.omie), omie = meta.fonte === 'omie';
     $('filtro-fonte').hidden = !temOmie;
     document.querySelectorAll('[data-fonte]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fonte === meta.fonte)));
-    $('topo-sub').textContent = omie ? 'Desempenho de vendas da NAK direto da Omie (ERP)' : 'Desempenho de vendas da NAK a partir do CRM DataCrazy';
+    $('topo-sub').textContent = 'Desempenho de Vendas NAK';
     $('topo-atual').textContent = omie ? 'Sincroniza com a Omie todo dia às 5h45' : 'Sincroniza com o CRM de hora em hora';
     $('aviso-carga').hidden = !(omie && meta.carga_incompleta);
     const neg = dash.data('negocios');
