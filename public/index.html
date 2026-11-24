@@ -73,13 +73,16 @@ html, body { margin: 0; background: #f4f4f5; }
 
   async function carrega() {
     try {
-      const r = await fetch('/api/dados', { credentials: 'same-origin' });
+      for (const k of Object.keys(DS)) DS[k] = { status: 'loading', data: [] };
+      const fonte = new URLSearchParams(location.search).get('fonte');
+      const r = await fetch('/api/dados' + (fonte ? '?fonte=' + encodeURIComponent(fonte) : ''), { credentials: 'same-origin' });
       if (r.status === 401) { location.href = '/login.html'; return; }
       const j = await r.json();
       if (!r.ok) throw new Error(j.erro || r.status);
       for (const k of Object.keys(DS)) DS[k] = { status: 'ok', data: j[k] || [] };
-      meta = { atualizado_em: j.atualizado_em, usuario: j.usuario || null };
+      meta = { atualizado_em: j.atualizado_em, usuario: j.usuario || null, fonte: j.fonte || 'crm', fontes: j.fontes || { crm: true }, carga_incompleta: !!j.carga_incompleta };
       dispatchEvent(new CustomEvent('nk:usuario', { detail: meta.usuario }));
+      dispatchEvent(new CustomEvent('nk:fonte', { detail: meta }));
     } catch (e) {
       console.error('[painel] falha ao carregar', e);
       for (const k of Object.keys(DS)) DS[k] = { status: 'error', data: [], message: String(e) };
@@ -351,6 +354,14 @@ html, body { margin: 0; background: #f4f4f5; }
 .nk-perfis li { border: 1px solid var(--nk-linha); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--nk-texto-2); display: grid; gap: 6px; align-content: start; }
 .nk-perfis li .nk-pill { justify-self: start; }
 .nk-aviso { background: var(--nk-laranja-claro); border: 1px solid #ffd9bf; color: var(--nk-texto); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin: 0; }
+.nk-aviso-carga { margin: 14px clamp(14px, 2.4vw, 28px) 0; }
+.nk-kpi-sub { font-size: 12px; color: var(--nk-texto-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.nk-conf-sit { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.nk-conf-sit button { font: inherit; font-size: 12.5px; border: 1px solid var(--nk-linha); border-left: 4px solid var(--cor, var(--nk-c)); background: #fff; color: var(--nk-texto); border-radius: 8px; padding: 6px 10px; cursor: pointer; display: inline-flex; gap: 6px; align-items: baseline; }
+.nk-conf-sit button b { font-variant-numeric: tabular-nums; }
+.nk-conf-sit button[aria-pressed="true"] { background: var(--nk-laranja-claro); border-color: var(--nk-laranja); border-left-color: var(--cor, var(--nk-c)); }
+.nk-csit { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; color: #fff; background: var(--cor, var(--nk-c)); }
+.nk td.neg { color: #b91c1c; } .nk td.pos { color: var(--nk-ok); }
 .nk-conta dl { margin: 0 0 4px; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 13.5px; }
 .nk-conta dt { color: var(--nk-texto-3); }
 .nk-conta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -370,6 +381,7 @@ html, body { margin: 0; background: #f4f4f5; }
       <button type="button" role="tab" id="aba-abc" data-pag="abc" aria-selected="false" title="Curva ABC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15c3-7 6-9 13-10"/></svg><span>Curva ABC</span></button>
       <button type="button" role="tab" id="aba-produtos" data-pag="produtos" aria-selected="false" title="Produtos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Produtos</span></button>
       <button type="button" role="tab" id="aba-carteira" data-pag="carteira" aria-selected="false" title="Carteira de clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18"/></svg><span>Carteira de clientes</span></button>
+      <button type="button" role="tab" id="aba-conferencia" data-pag="conferencia" aria-selected="false" title="Conferência CRM × Omie" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Conferência</span></button>
       <button type="button" role="tab" id="aba-funil" data-pag="funil" aria-selected="false" title="Funil e orçamentos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg><span>Funil e orçamentos</span></button>
     </nav>
     <div class="nk-lat-secao">Conta</div>
@@ -390,17 +402,21 @@ html, body { margin: 0; background: #f4f4f5; }
     <button type="button" class="nk-menu" id="menu-botao" aria-label="Recolher ou abrir o menu" aria-controls="lateral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg></button>
     <div class="nk-tit">
       <h1>Painel Comercial</h1>
-      <p class="nk-sub">Desempenho de vendas da NAK a partir do CRM DataCrazy</p>
+      <p class="nk-sub" id="topo-sub">Desempenho de Vendas NAK</p>
     </div>
-    <div class="nk-atual">Sincroniza com o CRM de hora em hora</div>
+    <div class="nk-atual" id="topo-atual">Sincroniza com o CRM de hora em hora</div>
   </header>
 
   <div class="nk-filtros" id="filtros">
     <div class="nk-filtro"><label for="f-periodo">Período</label><select class="dash-select" id="f-periodo" data-draw="f-periodo" data-source="c_periodos"></select></div>
     <div class="nk-filtro" id="filtro-vendedor"><label for="f-vendedor">Vendedor</label><select class="dash-select" id="f-vendedor" data-draw="f-vendedor" data-source="c_vend"></select></div>
+    <div class="nk-filtro" id="filtro-fonte" hidden><label>Fonte dos dados</label><div class="nk-seg" role="group" aria-label="Fonte dos dados"><button type="button" data-fonte="omie" aria-pressed="false">Omie (ERP)</button><button type="button" data-fonte="crm" aria-pressed="false">CRM</button></div></div>
     <button type="button" class="nk-limpar" id="f-limpar">Limpar filtros</button>
     <div class="nk-intervalo" id="f-intervalo">De <b data-draw="intervalo-ini">—</b> a <b data-draw="intervalo-fim">—</b></div>
   </div>
+
+  <p class="nk-aviso nk-aviso-carga" id="aviso-vazio" hidden>Ainda não há dados desta fonte. Um administrador pode abrir Conferência e clicar em Sincronizar agora.</p>
+  <p class="nk-aviso nk-aviso-carga" id="aviso-carga" hidden>A primeira carga da Omie ainda está em andamento (ela é feita em partes). Os números da Omie podem estar incompletos até ela terminar.</p>
 
   <!-- ===================== VISÃO GERAL ===================== -->
   <section class="nk-pagina" id="geral" role="tabpanel" aria-labelledby="aba-geral">
@@ -652,6 +668,49 @@ html, body { margin: 0; background: #f4f4f5; }
     </div>
   </section>
 
+  <!-- ===================== CONFERÊNCIA CRM × OMIE ===================== -->
+  <section class="nk-pagina" id="conferencia" role="tabpanel" aria-labelledby="aba-conferencia" hidden>
+    <div class="nk-card" id="card-sinc">
+      <div class="nk-card-cab">
+        <div><h3>Sincronização</h3><p class="nk-card-sub">O painel lê o CRM e a Omie sozinho (completa de madrugada, incremental de hora em hora). Use o botão para atualizar agora.</p></div>
+        <button type="button" class="nk-bt" id="sinc-agora" hidden>Sincronizar agora</button>
+      </div>
+      <p class="nk-msg" id="sinc-msg" role="status"></p>
+      <div class="nk-tab-wrap" style="max-height:260px">
+        <table id="t-sinc"><thead><tr><th class="txt">Fonte</th><th class="txt">Tipo</th><th>Início</th><th>Duração</th><th>Registros</th><th class="txt">Resultado</th></tr></thead><tbody data-draw="t-sinc"></tbody></table>
+      </div>
+    </div>
+    <div class="nk-kpis">
+      <div class="nk-kpi destaque"><div class="nk-kpi-rot">Faturado na Omie</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="omie">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="omie_n"></div></div>
+      <div class="nk-kpi"><div class="nk-kpi-rot">Faturado no CRM</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="crm">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="crm_n"></div></div>
+      <div class="nk-kpi"><div class="nk-kpi-rot">Diferença (CRM − Omie)</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="dif">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="dif_pct"></div></div>
+      <div class="nk-kpi"><div class="nk-kpi-rot">Pedidos que conferem</div><div class="nk-kpi-val" data-draw="conf-kpi" data-k="ok">—</div><div class="nk-kpi-sub" data-draw="conf-kpi" data-k="ok_sub"></div></div>
+    </div>
+    <div class="nk-card">
+      <div class="nk-card-cab"><div><h3>Faturado por mês nas duas fontes</h3><p class="nk-card-sub">Pedidos faturados no período escolhido · data do faturamento na Omie</p></div></div>
+      <div class="nk-tab-wrap" style="max-height:340px">
+        <table id="t-conf-mes" data-ord="t-conf-mes" data-ord-draw="t-conf-mes">
+          <thead><tr><th class="txt">Mês</th><th>Omie</th><th>Pedidos Omie</th><th>CRM</th><th>Negócios CRM</th><th>Diferença</th><th>Diferença %</th></tr></thead>
+          <tbody data-draw="t-conf-mes"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="nk-card">
+      <div class="nk-card-cab"><div><h3>Pedido a pedido</h3><p class="nk-card-sub" id="conf-sub">Número do pedido na Omie comparado com o nº do pedido gravado no negócio do CRM</p></div><span class="nk-cont" data-draw="conf-cont">—</span></div>
+      <div class="nk-ferr">
+        <input type="search" id="conf-busca" placeholder="Buscar pedido ou cliente…" aria-label="Buscar pedido ou cliente na conferência">
+      </div>
+      <div class="nk-conf-sit" id="conf-sit" data-draw="conf-sit"></div>
+      <div class="nk-tab-wrap">
+        <table id="t-conf" data-ord="t-conf" data-ord-draw="t-conf">
+          <thead><tr><th class="txt">Situação</th><th>Pedido</th><th class="txt">Cliente</th><th>Data</th><th class="txt">Etapa na Omie</th><th class="txt">Etapa no CRM</th><th>Valor Omie</th><th>Valor CRM</th><th>Diferença</th><th class="txt esconde-estreito">Negócio no CRM</th><th class="txt esconde-estreito">Vendedor</th></tr></thead>
+          <tbody data-draw="t-conf"><tr><td colspan="11" class="txt">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+      <button type="button" class="nk-mais" id="conf-mais" hidden>Mostrar mais</button>
+    </div>
+  </section>
+
   <!-- ===================== ACESSOS (administrador e supervisor) ===================== -->
   <section class="nk-pagina" id="acessos" role="tabpanel" aria-labelledby="aba-acessos" hidden>
     <div class="nk-card" id="card-acessos">
@@ -723,7 +782,9 @@ html, body { margin: 0; background: #f4f4f5; }
     <details>
       <summary>Como os números são calculados</summary>
       <ul>
-        <li>Fonte: funil [Vendas] [Omie] do CRM DataCrazy, lido pela API do CRM de hora em hora no horário comercial e por completo toda madrugada. A etapa Duplicado fica de fora.</li>
+        <li data-fonte-txt="omie" hidden>Fonte Omie: pedidos de venda lidos direto da API da Omie (ERP), com itens, clientes e vendedores. Faturado = pedido faturado na Omie, na data do faturamento; em aberto = etapas 10 (orçamento/pedido), 20 (separar estoque) e 50 (faturar); cancelados e devolvidos contam como perdidos. Vendedor de acesso "vendedor" é ligado pelo e-mail do vendedor na Omie.</li>
+        <li data-fonte-txt="omie" hidden>Conferência: o número do pedido na Omie é comparado com o nº do pedido gravado no negócio do CRM (externalId), sem a etapa Duplicado. "Etapa diferente" compara faturado, em aberto e perdido. "Valor diferente" é diferença acima de R$ 0,05. Pedidos da Omie anteriores ao primeiro negócio do CRM e pedidos cancelados que nunca foram ao CRM ficam de fora.</li>
+        <li>Fonte CRM: funil [Vendas] [Omie] do CRM DataCrazy, lido pela API do CRM de hora em hora no horário comercial e por completo toda madrugada. A etapa Duplicado fica de fora.</li>
         <li>Produtos: itens de cada negócio faturado como estão no CRM.</li>
         <li>A data de cada negócio é a da última mudança de etapa (o CRM não informa a data de criação). Para pedidos faturados, é o dia do faturamento.</li>
         <li>Faturado: etapa Faturado. Em aberto: Orçamento Gerado, Separação de Estoque e Aguardando Faturamento. Taxa de fechamento: faturados ÷ (faturados + em aberto).</li>
@@ -2128,6 +2189,212 @@ window.NK = (function () {
       msg('ct-msg', 'Senha trocada.', 'ok');
     } catch (e) { msg('ct-msg', e.message, 'erro'); }
   });
+})();
+</script>
+
+<script>
+// ===================== FONTE DOS DADOS (CRM ou Omie) E CONFERÊNCIA CRM × OMIE =====================
+(function () {
+  const NK = window.NK, F = NK.f, $ = (id) => document.getElementById(id);
+  let eu = null, meta = null;
+
+  const ajustaFonte = () => {
+    if (!meta) return;
+    const temOmie = !!(meta.fontes && meta.fontes.omie), omie = meta.fonte === 'omie';
+    $('filtro-fonte').hidden = !temOmie;
+    document.querySelectorAll('[data-fonte]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fonte === meta.fonte)));
+    $('topo-sub').textContent = 'Desempenho de Vendas NAK';
+    $('topo-atual').textContent = omie ? 'Sincroniza com a Omie todo dia às 5h45' : 'Sincroniza com o CRM de hora em hora';
+    $('aviso-carga').hidden = !(omie && meta.carga_incompleta);
+    const neg = dash.data('negocios');
+    $('aviso-vazio').hidden = !(neg.status === 'ok' && !neg.data.length);
+    $('sinc-agora').hidden = !(eu && eu.perfil === 'admin');
+    document.querySelectorAll('[data-fonte-txt]').forEach((n) => { n.hidden = !temOmie; });
+    const gestor = eu && (eu.perfil === 'admin' || eu.perfil === 'supervisor');
+    $('aba-conferencia').hidden = !(temOmie && gestor);
+  };
+  addEventListener('nk:usuario', (ev) => { eu = ev.detail; ajustaFonte(); });
+  addEventListener('nk:fonte', (ev) => { meta = ev.detail; ajustaFonte(); if (location.hash === '#conferencia') carregaConf(); });
+
+  document.querySelectorAll('[data-fonte]').forEach((b) => b.addEventListener('click', () => {
+    if (meta && b.dataset.fonte === meta.fonte) return;
+    const u = new URL(location.href);
+    u.searchParams.set('fonte', b.dataset.fonte);
+    history.replaceState(null, '', u);
+    document.querySelectorAll('[data-fonte]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    dash.setParams({ vendedor: 'Todos' }); // os nomes dos vendedores mudam entre as fontes
+    dash.refresh();
+  }));
+
+  // ---- conferência
+  const COR = { 'Confere': 'var(--nk-ok)', 'Valor diferente': 'var(--nk-atencao)', 'Etapa diferente': 'var(--nk-risco)', 'Só na Omie': 'var(--nk-critico)',
+    'Só no CRM': '#7c3aed', 'Repetido no CRM': 'var(--nk-inativo)', 'CRM sem nº do pedido': 'var(--nk-sem)' };
+  const ORDEM = Object.keys(COR);
+  let conf = { status: 'idle', data: null }, fsit = '', lim = 100, q = '';
+  NK.ord['t-conf'] = { i: 0, dir: 'desc' }; // problemas primeiro
+
+  async function carregaConf(forcar) {
+    if (!forcar && (conf.status === 'loading' || conf.status === 'ok')) return;
+    conf = { status: 'loading', data: null };
+    try {
+      const r = await fetch('/api/conferencia', { credentials: 'same-origin' });
+      if (r.status === 401) { location.href = '/login.html'; return; }
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.erro || r.status);
+      conf = { status: 'ok', data: j };
+      $('conf-sub').textContent = 'Número do pedido na Omie comparado com o nº do pedido gravado no negócio do CRM' +
+        (j.crm_desde ? ' · pedidos da Omie a partir de ' + F.data(j.crm_desde) + ' (primeiro negócio do CRM)' : '') +
+        (j.carga_incompleta ? ' · primeira carga da Omie ainda em andamento' : '');
+    } catch (e) { console.error('[conferencia]', e); conf = { status: 'error', data: null, message: String(e.message || e) }; }
+    redesenha();
+  }
+  // ---- sincronização manual (só administrador)
+  const quando = (s) => (s ? new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+  dash.draw('t-sinc', (tb) => {
+    if (conf.status !== 'ok') return vazio(tb, msgEstado());
+    const L = conf.data.sincronizacoes || [];
+    if (!L.length) return vazio(tb, 'Nenhuma sincronização ainda.');
+    tb.replaceChildren();
+    const cols = [
+      { cls: 'txt', fn: (r) => (r.tipo.startsWith('omie-') ? 'Omie' : 'CRM') }, { cls: 'txt', fn: (r) => r.tipo.replace('omie-', '') },
+      { fn: (r) => quando(r.inicio) }, { fn: (r) => (r.fim ? Math.max(1, Math.round((Date.parse(r.fim) - Date.parse(r.inicio)) / 1000)) + ' s' : 'rodando') },
+      { fn: (r) => F.int((r.negocios || 0)) + (r.tipo.startsWith('omie-') ? ' pedidos' : ' negócios') },
+      { cls: 'txt', fn: (r, td) => { if (r.ok === false) td.classList.add('neg'); return r.ok === false ? 'Erro: ' + (r.erro || '') : r.ok ? (r.erro ? 'Ok (' + r.erro + ')' : 'Ok') : '—'; } },
+    ];
+    for (const r of L) NK.linhaTabela(tb, r, cols);
+  });
+  async function post(fonte) {
+    const r = await fetch('/api/sync', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fonte }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error((fonte === 'omie' ? 'Omie: ' : 'CRM: ') + (j.erro || 'erro ' + r.status));
+    return j;
+  }
+  $('sinc-agora').addEventListener('click', async () => {
+    const bt = $('sinc-agora'), m = $('sinc-msg');
+    bt.disabled = true; m.className = 'nk-msg';
+    try {
+      m.textContent = 'Lendo o CRM… (a primeira vez leva uns 3 minutos)';
+      const c = await post('crm');
+      let o, parte = 0;
+      do {
+        parte++;
+        m.textContent = `CRM ok (${F.int(c.negocios)} negócios). Lendo a Omie… parte ${parte}` + (o ? ` (${F.int(o.pedidos)} pedidos nesta parte)` : '');
+        o = await post('omie');
+      } while (o.parcial && parte < 30);
+      m.textContent = o.parcial ? 'A carga da Omie ainda não terminou; clique de novo para continuar.' : 'Pronto. CRM e Omie atualizados.';
+      m.className = 'nk-msg ' + (o.parcial ? '' : 'ok');
+      dash.refresh();
+    } catch (e) { m.textContent = e.message; m.className = 'nk-msg erro'; }
+    finally { bt.disabled = false; carregaConf(true); }
+  });
+
+  const redesenha = () => ['t-sinc', 'conf-kpi', 'conf-sit', 'conf-cont', 't-conf', 't-conf-mes'].forEach((n) => dash.draw(n));
+  addEventListener('nk:pagina', (ev) => { if (ev.detail === 'conferencia') carregaConf(); });
+
+  // Linhas do período e vendedor escolhidos.
+  function doPeriodo() {
+    if (conf.status !== 'ok') return null;
+    const d = dash.data('c_periodos');
+    const p = d.status === 'ok' && d.data.length ? NK.per(d.data) : null;
+    const { vendedor } = NK.filtro();
+    return conf.data.linhas.filter((r) => (!p || (r.data && r.data >= p.ini && r.data <= p.fim)) && (vendedor === 'Todos' || r.vendedor === vendedor));
+  }
+  const vazio = (el, msg) => {
+    el.replaceChildren();
+    if (el.tagName === 'TBODY') { const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 11; td.className = 'txt'; td.textContent = msg; tr.appendChild(td); el.appendChild(tr); }
+    else el.textContent = msg;
+  };
+  const msgEstado = () => (conf.status === 'error' ? 'Falha ao carregar: ' + conf.message : 'Carregando…');
+
+  dash.draw('conf-kpi', (el) => {
+    const L = doPeriodo();
+    if (!L) { el.textContent = el.classList.contains('nk-kpi-val') ? '—' : ''; return; }
+    const fo = L.filter((r) => r.omie_etapa === 'Faturado'), fc = L.filter((r) => r.crm_etapa === 'Faturado');
+    const so = fo.reduce((s, r) => s + r.omie_valor, 0), sc = fc.reduce((s, r) => s + r.crm_valor, 0);
+    const comp = L.filter((r) => r.situacao !== 'CRM sem nº do pedido'), ok = comp.filter((r) => r.situacao === 'Confere').length;
+    const v = { omie: F.brl(so), omie_n: F.int(fo.length) + ' pedidos', crm: F.brl(sc), crm_n: F.int(fc.length) + ' negócios',
+      dif: F.brl(sc - so), dif_pct: so ? F.pct((sc - so) / so) + ' sobre a Omie' : '', ok: comp.length ? F.pct(ok / comp.length) : '—',
+      ok_sub: F.int(ok) + ' de ' + F.int(comp.length) + ' pedidos' }[el.dataset.k];
+    el.textContent = v ?? '';
+  });
+
+  dash.draw('conf-cont', (el) => {
+    const L = doPeriodo();
+    el.textContent = L ? F.int(filtra(L).length) + ' na lista' : '—';
+  });
+
+  dash.draw('conf-sit', (el) => {
+    const L = doPeriodo();
+    el.replaceChildren();
+    if (!L) return;
+    const cont = new Map();
+    for (const r of L) cont.set(r.situacao, (cont.get(r.situacao) || 0) + 1);
+    const bt = (rot, chave, n, cor) => {
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(fsit === chave));
+      if (cor) b.style.setProperty('--cor', cor);
+      b.append(rot + ' '); const x = document.createElement('b'); x.textContent = F.int(n); b.appendChild(x);
+      b.addEventListener('click', () => { fsit = fsit === chave ? '' : chave; lim = 100; redesenha(); });
+      el.appendChild(b);
+    };
+    bt('Todas', '', L.length, 'var(--nk-preto)');
+    for (const s of ORDEM) if (cont.get(s)) bt(s, s, cont.get(s), COR[s]);
+  });
+
+  const filtra = (L) => L.filter((r) => (!fsit || r.situacao === fsit) &&
+    (!q || String(r.pedido || '').includes(q) || String(r.cliente || '').includes(q) || String(r.crm_cliente || '').includes(q) || r.crm_negocios.some((n) => String(n) === q)));
+  const sitTag = (s) => { const t = document.createElement('span'); t.className = 'nk-csit'; t.style.setProperty('--cor', COR[s] || 'var(--nk-c)'); t.textContent = s; return t; };
+  const etapaTag = (e) => { if (!e) return '—'; const t = document.createElement('span'); t.className = 'nk-etapa' + (e === 'Faturado' ? ' fat' : ''); t.textContent = e; return t; };
+
+  dash.draw('t-conf', (tb) => {
+    const L = doPeriodo();
+    if (!L) return vazio(tb, msgEstado());
+    const rows = filtra(L);
+    if (!rows.length) return vazio(tb, 'Nenhum pedido nesse filtro.');
+    const cols = [
+      { cls: 'txt', o: (r) => ORDEM.indexOf(r.situacao), fn: (r) => sitTag(r.situacao) },
+      { o: (r) => Number(r.pedido) || null, fn: (r) => r.pedido || '—' },
+      { cls: 'txt', fn: (r) => r.cliente || '—' },
+      { o: 'data', fn: (r) => F.data(r.data) },
+      { cls: 'txt', o: 'omie_etapa', fn: (r) => etapaTag(r.omie_etapa) },
+      { cls: 'txt', o: 'crm_etapa', fn: (r) => etapaTag(r.crm_etapa) },
+      { o: 'omie_valor', fn: (r) => (r.omie_valor == null ? '—' : F.brl(r.omie_valor)) },
+      { o: 'crm_valor', fn: (r) => (r.crm_valor == null ? '—' : F.brl(r.crm_valor)) },
+      { o: (r) => (r.dif == null ? null : Math.abs(r.dif)), fn: (r, td) => { if (r.dif == null || Math.abs(r.dif) <= 0.05) return '—'; td.classList.add(r.dif < 0 ? 'neg' : 'pos'); return F.brl(r.dif); } },
+      { cls: 'txt esconde-estreito', o: (r) => r.crm_negocios.length, fn: (r) => (r.crm_negocios.length ? r.crm_negocios.map((n) => '#' + n).join(', ') : '—') },
+      { cls: 'txt esconde-estreito', fn: (r) => r.vendedor },
+    ];
+    tb.replaceChildren();
+    for (const r of NK.ordCols(rows, cols, 't-conf').slice(0, lim)) NK.linhaTabela(tb, { ...r, cliente: undefined, _c: r.cliente }, cols.map((c, i) => (i === 2 ? { ...c, fn: (x) => x._c || '—' } : c)));
+    $('conf-mais').hidden = rows.length <= lim;
+  });
+
+  dash.draw('t-conf-mes', (tb) => {
+    const L = doPeriodo();
+    if (!L) return vazio(tb, msgEstado());
+    const m = new Map();
+    for (const r of L) {
+      const k = r.data ? r.data.slice(0, 7) : null; if (!k) continue;
+      const o = m.get(k) || { mes: k, omie: 0, on: 0, crm: 0, cn: 0 };
+      if (r.omie_etapa === 'Faturado') { o.omie += r.omie_valor; o.on += 1; }
+      if (r.crm_etapa === 'Faturado') { o.crm += r.crm_valor; o.cn += 1; }
+      m.set(k, o);
+    }
+    const rows = [...m.values()].filter((o) => o.on || o.cn).map((o) => ({ ...o, dif: o.crm - o.omie, pct: o.omie ? (o.crm - o.omie) / o.omie : null }));
+    if (!rows.length) return vazio(tb, 'Nenhum faturamento no período.');
+    if (!NK.ord['t-conf-mes']) NK.ord['t-conf-mes'] = { i: 0, dir: 'desc' };
+    const cols = [
+      { cls: 'txt', o: 'mes', fn: (r) => F.mesLongo(r.mes) }, { cls: 'forte', o: 'omie', fn: (r) => F.brl(r.omie) }, { o: 'on', fn: (r) => F.int(r.on) },
+      { cls: 'forte', o: 'crm', fn: (r) => F.brl(r.crm) }, { o: 'cn', fn: (r) => F.int(r.cn) },
+      { o: 'dif', fn: (r, td) => { if (Math.abs(r.dif) > 0.05) td.classList.add(r.dif < 0 ? 'neg' : 'pos'); return F.brl(r.dif); } },
+      { o: 'pct', fn: (r) => (r.pct == null ? '—' : F.pct(r.pct)) },
+    ];
+    tb.replaceChildren();
+    for (const r of NK.ordCols(rows, cols, 't-conf-mes')) NK.linhaTabela(tb, { ...r }, cols);
+  });
+
+  $('conf-busca').addEventListener('input', (e) => { q = e.target.value.trim().toUpperCase(); lim = 100; redesenha(); });
+  $('conf-mais').addEventListener('click', () => { lim += 200; dash.draw('t-conf'); });
+  document.querySelectorAll('.nk table[data-ord="t-conf"], .nk table[data-ord="t-conf-mes"]').forEach((t) => NK.marcaOrd(t));
 })();
 </script>
 </div>
